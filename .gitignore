@@ -1,0 +1,6 @@
+/.idea
+/.vscode
+
+config.yml
+
+dist/
