@@ -57,6 +57,7 @@ func (t *Tunnel) reloadClient() {
 }
 
 type tunnelHandlerImpl struct {
+	tunnel     string
 	serverAddr string
 	protocol   string
 	listen     string
@@ -65,18 +66,23 @@ type tunnelHandlerImpl struct {
 	stopCh     chan int
 }
 
+func (t *tunnelHandlerImpl) GetDefinition() string {
+	return t.tunnel
+}
+
 func newTunnelHandler(serverAddr string, tun string, cipher sscore.Cipher) (tunnelHandler, error) {
 	protocol, listen, target, err := config.ParseTunnel(tun)
 	if err != nil { // should already be validated in config.CreateConfigOrDie
 		return nil, err
 	}
 	return &tunnelHandlerImpl{
+		tunnel:     tun,
 		serverAddr: serverAddr,
 		protocol:   protocol,
 		listen:     listen,
 		target:     target,
 		cipher:     cipher,
-		stopCh:     make(chan int),
+		stopCh:     make(chan int, 1),
 	}, nil
 }
 
@@ -104,8 +110,12 @@ func (t *tunnelHandlerImpl) startTcpTunnel() {
 		log.Errorf("Failed to listen on %s: %v", t.listen, err)
 		return
 	}
-	defer closeWhatever(listener)
+	defer doClose(listener)
 	log.Infof("TCP tunnel start: -> %s -> %s -> %s", t.listen, t.serverAddr, t.target)
+	go func() {
+		<-t.stopCh
+		doClose(listener)
+	}()
 
 	targetSock := socks.ParseAddr(t.target)
 	if targetSock == nil {
@@ -120,25 +130,34 @@ func (t *tunnelHandlerImpl) startTcpTunnel() {
 			continue
 		}
 
+		log.Infof("Accepted connection from %s", cliConn.RemoteAddr())
+
 		go func() {
-			defer closeWhatever(cliConn)
+			defer doClose(cliConn)
+			log.Infof("Dial server %s start", t.serverAddr)
 			svrConn, err := net.Dial("tcp", t.serverAddr)
 			if err != nil {
 				log.Errorf("Failed to connect to server %s: %v", t.serverAddr, err)
 				return
 			}
-			defer closeWhatever(svrConn)
+			defer doClose(svrConn)
+			log.Infof("Dial server %s done", t.serverAddr)
 
 			// TODO: TCP cork support
 			svrConn = t.cipher.StreamConn(svrConn)
 
+			if err = writeMagic(svrConn); err != nil {
+				log.Errorf("Failed to send magic: %v", err)
+				return
+			}
 			if _, err = svrConn.Write(targetSock); err != nil {
 				log.Errorf("Failed to send target address: %v", err)
 				return
 			}
 
-			log.Infof("TCP relay start: %s <-> %s <-> %s <-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
+			log.Infof("TCP relay start: %s <-[ %s <-> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
 			relayTcp(cliConn, svrConn)
+			log.Infof("TCP relay end: %s <-[ %s <-> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
 		}()
 	}
 

@@ -17,6 +17,7 @@ func CreateConfigOrDie() *Config {
 	flag.StringVar(&conf.Mode, "m", "", "The mode of etunnel. Options: client, server")
 	flag.StringVar(&conf.Crypt, "c", Crypts[0], "The encryption method to use")
 	flag.StringVar(&conf.Key, "k", "hidden secret", "The secret password for encryption")
+	flag.StringVar(&conf.Server, "s", "127.0.0.1:12000", "(client) The address of the etunnel server")
 	flag.Var(&conf.Tunnels, "t", "(client) A list of encrypted tunnels")
 	flag.StringVar(&conf.Listen, "l", "127.0.0.1:12000", "(server) The address to listen to")
 
@@ -70,21 +71,21 @@ func validateConfig(conf *Config) error {
 	}
 
 	if conf.Mode == ModeClient {
-		if err := ValidateTunnel(conf.Server); err != nil {
-			return err
+		if err := ValidateAddress(conf.Server); err != nil {
+			return fmt.Errorf("invalid server adderss %s: %v", conf.Server, err)
 		}
 		if len(conf.Tunnels) == 0 {
 			return errors.New("no tunnels are defined")
 		}
 		for _, t := range conf.Tunnels {
 			if err := ValidateTunnel(t); err != nil {
-				return err
+				return fmt.Errorf("invalid tunnel definition %s: %v", t, err)
 			}
 		}
 	}
 	if conf.Mode == ModeServer {
-		if err := ValidateTunnel(conf.Listen); err != nil {
-			return err
+		if err := ValidateAddress(conf.Listen); err != nil {
+			return fmt.Errorf("invalid listen adderss %s: %v", conf.Listen, err)
 		}
 	}
 

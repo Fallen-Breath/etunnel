@@ -13,7 +13,9 @@ import (
 func main() {
 	conf := config.CreateConfigOrDie()
 
-	log.Infof("%s v%s starting", constants.Name, constants.Version)
+	log.StandardLogger().SetFormatter(&log.TextFormatter{TimestampFormat: "2006-01-02 15:04:05.000"})
+
+	log.Infof("%s v%s starting, mode %s", constants.Name, constants.Version, conf.Mode)
 	tun, err := tunnel.NewTunnel(conf)
 	if err != nil {
 		log.Fatalf("Failed to initialize %s: %v", constants.Name, err)

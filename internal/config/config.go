@@ -10,6 +10,7 @@ type Config struct {
 	Mode  string `yaml:"mode"` // client, server
 	Crypt string `yaml:"crypt"`
 	Key   string `yaml:"key"`
+	Debug bool   `yaml:"debug"`
 
 	// client
 	Tunnels stringList `yaml:"tunnels"`
