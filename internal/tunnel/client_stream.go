@@ -61,11 +61,11 @@ func (t *tunnelHandlerImpl) handleStreamConnection(cliConn conn.StreamConn) {
 		return
 	}
 
-	log.Infof("TCP relay start: %s -[ %s -> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
+	log.Infof("Relay start: %s -[ %s -> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
 	send, recv := relayConnection(cliConn, svrConn)
 	flow := ""
 	if log.StandardLogger().Level >= log.DebugLevel {
 		flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
 	}
-	log.Infof("TCP relay end: %s -[ %s -> %s ]-> %s%s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target, flow)
+	log.Infof("Relay end: %s -[ %s -> %s ]-> %s%s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target, flow)
 }
