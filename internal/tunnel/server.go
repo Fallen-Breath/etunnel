@@ -1,11 +1,13 @@
 package tunnel
 
 import (
-	"github.com/shadowsocks/go-shadowsocks2/socks"
+	"github.com/Fallen-Breath/etunnel/internal/conn"
+	"github.com/Fallen-Breath/etunnel/internal/protocol/header"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 // reference: github.com/shadowsocks/go-shadowsocks2/tcp.go tcpRemote
@@ -40,40 +42,38 @@ func (t *Tunnel) runServer() {
 
 		go func() {
 			defer doClose(cliConn)
-			log.Infof("Read header")
 
 			// TODO: TCP cork support
-			originConn := cliConn
-			cliConn := t.cipher.StreamConn(cliConn)
 
-			if err = readMagic(cliConn); err != nil {
-				log.Errorf("Failed to read magic: %v", err)
-				return
-			}
-			target, err := socks.ReadAddr(cliConn)
-			if err != nil {
-				log.Errorf("failed to get target address from %v: %v", originConn.RemoteAddr(), err)
-				// drain c to avoid leaking server behavioral features
+			originConn := cliConn.(*net.TCPConn)
+			cliConn := conn.NewEncryptedStreamConn(originConn, t.cipher)
+
+			log.Infof("Read header")
+			var head header.Header
+			if err := head.UnmarshalFrom(cliConn); err != nil {
+				log.Errorf("Failed to read header: %v", err)
+				// drain originConn to avoid leaking server behavioral features
 				// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
+				_ = originConn.SetDeadline(time.Now().Add(30 * time.Second)) // TODO: find a nice way to close connection
 				_, err = io.Copy(io.Discard, originConn)
 				if err != nil {
-					log.Errorf("discard error: %v", err)
+					log.Errorf("Discard error: %v", err)
 				}
 				return
 			}
 
-			log.Infof("Dial target %s start", target.String())
-			targetConn, err := net.Dial("tcp", target.String())
+			target := head.Target
+			log.Infof("Dial target %s://%s start", head.Protocol, head.Target)
+			targetConn, err := net.Dial(head.Protocol, target)
 			if err != nil {
-				log.Errorf("Failed to connect to target %s: %v", target, err)
+				log.Errorf("Failed to connect to target %s://%s: %v", head.Protocol, head.Target, err)
 				return
 			}
 			defer doClose(targetConn)
-			log.Infof("Dial target %s done", target.String())
 
-			log.Infof("TCP forward start %s <-> %s", cliConn.RemoteAddr(), target)
-			relayTcp(cliConn, targetConn)
-			log.Infof("TCP forward end %s <-> %s", cliConn.RemoteAddr(), target)
+			log.Infof("Forward start %s <-> %s", cliConn.RemoteAddr(), target)
+			relayConnection(cliConn, targetConn)
+			log.Infof("Forward end %s <-> %s", cliConn.RemoteAddr(), target)
 		}()
 	}
 }

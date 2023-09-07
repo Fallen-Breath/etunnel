@@ -2,8 +2,9 @@ package tunnel
 
 import (
 	"github.com/Fallen-Breath/etunnel/internal/config"
+	"github.com/Fallen-Breath/etunnel/internal/conn"
+	"github.com/Fallen-Breath/etunnel/internal/protocol/header"
 	sscore "github.com/shadowsocks/go-shadowsocks2/core"
-	"github.com/shadowsocks/go-shadowsocks2/socks"
 	log "github.com/sirupsen/logrus"
 	"net"
 )
@@ -117,10 +118,9 @@ func (t *tunnelHandlerImpl) startTcpTunnel() {
 		doClose(listener)
 	}()
 
-	targetSock := socks.ParseAddr(t.target)
-	if targetSock == nil {
-		log.Errorf("Failed to parse socket addr from %s", t.target)
-		return
+	head := header.Header{
+		Protocol: t.protocol,
+		Target:   t.target,
 	}
 
 	for {
@@ -144,19 +144,15 @@ func (t *tunnelHandlerImpl) startTcpTunnel() {
 			log.Infof("Dial server %s done", t.serverAddr)
 
 			// TODO: TCP cork support
-			svrConn = t.cipher.StreamConn(svrConn)
+			svrConn = conn.NewEncryptedStreamConn(svrConn.(conn.StreamConn), t.cipher)
 
-			if err = writeMagic(svrConn); err != nil {
-				log.Errorf("Failed to send magic: %v", err)
-				return
-			}
-			if _, err = svrConn.Write(targetSock); err != nil {
-				log.Errorf("Failed to send target address: %v", err)
+			if err = head.MarshalTo(svrConn); err != nil {
+				log.Errorf("Failed to write header: %v", err)
 				return
 			}
 
 			log.Infof("TCP relay start: %s <-[ %s <-> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
-			relayTcp(cliConn, svrConn)
+			relayConnection(cliConn, svrConn)
 			log.Infof("TCP relay end: %s <-[ %s <-> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
 		}()
 	}
