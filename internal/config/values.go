@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/Fallen-Breath/etunnel/internal/proto"
+	"github.com/Fallen-Breath/etunnel/internal/utils"
 	"net"
 	"strings"
 )
@@ -40,7 +42,7 @@ func ParseTunnel(tun string) (protocol, listen, target string, err error) {
 	}
 
 	protocol = t[0]
-	if protocol != "tcp" && protocol != "udp" {
+	if !utils.Contains(proto.Protocols, protocol) {
 		return "", "", "", fmt.Errorf("invalid protocol %s", protocol)
 	}
 

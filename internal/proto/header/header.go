@@ -3,7 +3,7 @@ package header
 import (
 	"errors"
 	"fmt"
-	"github.com/Fallen-Breath/etunnel/internal/protocol"
+	"github.com/Fallen-Breath/etunnel/internal/proto"
 	"io"
 )
 
@@ -32,16 +32,15 @@ func (h *Header) MarshalTo(writer io.Writer) error {
 	var targetPacker func(string) (byte, []byte, error)
 
 	switch h.Protocol {
-	case protocol.Tcp:
+	case proto.Tcp:
 		magic |= pTcp
 		targetPacker = packAddress
-	case protocol.Udp:
+	case proto.Udp:
 		magic |= pUdp
 		targetPacker = packAddress
-	case protocol.Unix:
+	case proto.Unix:
 		magic |= pUnix
 		targetPacker = packString
-		return errors.New("unix socket is not supported yet")
 	default:
 		return fmt.Errorf("unsupported protocol %s", h.Protocol)
 	}
@@ -78,13 +77,13 @@ func (h *Header) UnmarshalFrom(reader io.Reader) error {
 
 	switch protocolType {
 	case pTcp:
-		h.Protocol = protocol.Tcp
+		h.Protocol = proto.Tcp
 		targetReader = readAddress
 	case pUdp:
-		h.Protocol = protocol.Udp
+		h.Protocol = proto.Udp
 		targetReader = readAddress
 	case pUnix:
-		h.Protocol = protocol.Unix
+		h.Protocol = proto.Unix
 		targetReader = readString
 	default:
 		return fmt.Errorf("unsupported protocol type %d", protocolType)

@@ -8,21 +8,16 @@ import (
 	"sync"
 )
 
-func doClose(c io.Closer) {
-	if err := c.Close(); err != nil {
-		log.Debugf("Close error %v", err)
-	}
-}
-
-func relayConnection(left, right net.Conn) {
+func relayConnection(left, right net.Conn) (l2r int64, r2l int64) {
 	var wg sync.WaitGroup
 
-	singleForward := func(name string, source net.Conn, target net.Conn) {
+	forward := func(source net.Conn, target net.Conn, name string, count *int64) {
 		defer wg.Done()
 
-		log.Infof("Forward start %s", name)
-		_, err := io.Copy(target, source)
-		log.Infof("Forward end %s %v", name, err)
+		log.Debugf("Forward start %s", name)
+		n, err := io.Copy(target, source)
+		log.Debugf("Forward end %s %v", name, err)
+		*count = n
 
 		if err == nil { // source EOF, no more incoming data from source, so stop sending more data to target
 			if sc, ok := target.(conn.StreamConn); ok {
@@ -33,12 +28,15 @@ func relayConnection(left, right net.Conn) {
 				_ = sc.CloseRead()
 			}
 		} else {
-
+			_ = source.Close()
+			_ = target.Close()
 		}
 	}
 
 	wg.Add(2)
-	go singleForward("L->R", left, right)
-	go singleForward("L<-R", right, left)
+	go forward(left, right, "L->R", &l2r)
+	go forward(right, left, "L<-R", &r2l)
 	wg.Wait()
+
+	return
 }

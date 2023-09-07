@@ -1,4 +1,4 @@
-package protocol
+package proto
 
 // Stream format: [ Magic ] [ Address data ] [ Payload ... )
 // Protocol (1 Byte):

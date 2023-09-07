@@ -1,8 +1,9 @@
 package tunnel
 
 import (
+	"fmt"
 	"github.com/Fallen-Breath/etunnel/internal/conn"
-	"github.com/Fallen-Breath/etunnel/internal/protocol/header"
+	"github.com/Fallen-Breath/etunnel/internal/proto/header"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
@@ -38,42 +39,47 @@ func (t *Tunnel) runServer() {
 			log.Errorf("Failed to accept: %v", err)
 			continue
 		}
-		log.Infof("Accepted connection from %s", cliConn.RemoteAddr())
 
-		go func() {
-			defer doClose(cliConn)
-
-			// TODO: TCP cork support
-
-			originConn := cliConn.(*net.TCPConn)
-			cliConn := conn.NewEncryptedStreamConn(originConn, t.cipher)
-
-			log.Infof("Read header")
-			var head header.Header
-			if err := head.UnmarshalFrom(cliConn); err != nil {
-				log.Errorf("Failed to read header: %v", err)
-				// drain originConn to avoid leaking server behavioral features
-				// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
-				_ = originConn.SetDeadline(time.Now().Add(30 * time.Second)) // TODO: find a nice way to close connection
-				_, err = io.Copy(io.Discard, originConn)
-				if err != nil {
-					log.Errorf("Discard error: %v", err)
-				}
-				return
-			}
-
-			target := head.Target
-			log.Infof("Dial target %s://%s start", head.Protocol, head.Target)
-			targetConn, err := net.Dial(head.Protocol, target)
-			if err != nil {
-				log.Errorf("Failed to connect to target %s://%s: %v", head.Protocol, head.Target, err)
-				return
-			}
-			defer doClose(targetConn)
-
-			log.Infof("Forward start %s <-> %s", cliConn.RemoteAddr(), target)
-			relayConnection(cliConn, targetConn)
-			log.Infof("Forward end %s <-> %s", cliConn.RemoteAddr(), target)
-		}()
+		log.Debugf("Accepted connection from %s", cliConn.RemoteAddr())
+		go t.handleConnection(cliConn.(conn.StreamConn))
 	}
+}
+func (t *Tunnel) handleConnection(cliConn conn.StreamConn) {
+	defer func() { _ = cliConn.Close() }()
+	originConn := cliConn
+
+	if t.conf.Cork {
+		cliConn = conn.NewTimedCorkConn(cliConn, 10*time.Millisecond, 1280)
+	}
+	cliConn = conn.NewEncryptedStreamConn(originConn, t.cipher)
+
+	var head header.Header
+	if err := head.UnmarshalFrom(cliConn); err != nil {
+		log.Errorf("Failed to read header: %v", err)
+		// drain originConn to avoid leaking server behavioral features
+		// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
+		_ = originConn.SetDeadline(time.Now().Add(30 * time.Second)) // TODO: find a nice way to close connection
+		_, err = io.Copy(io.Discard, originConn)
+		if err != nil {
+			log.Errorf("Discard error: %v", err)
+		}
+		return
+	}
+
+	target := head.Target
+	targetConn, err := net.Dial(head.Protocol, target)
+	if err != nil {
+		log.Errorf("Failed to connect to target %s://%s: %v", head.Protocol, head.Target, err)
+		return
+	}
+	defer func() { _ = targetConn.Close() }()
+
+	log.Infof("Relay start %s <-> %s", cliConn.RemoteAddr(), target)
+	send, recv := relayConnection(cliConn, targetConn)
+	flow := ""
+	if log.StandardLogger().Level >= log.DebugLevel {
+		flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
+	}
+	log.Infof("Relay end %s -> %s%s", cliConn.RemoteAddr(), target, flow)
+
 }

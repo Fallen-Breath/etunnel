@@ -2,11 +2,9 @@ package tunnel
 
 import (
 	"github.com/Fallen-Breath/etunnel/internal/config"
-	"github.com/Fallen-Breath/etunnel/internal/conn"
-	"github.com/Fallen-Breath/etunnel/internal/protocol/header"
+	"github.com/Fallen-Breath/etunnel/internal/proto"
 	sscore "github.com/shadowsocks/go-shadowsocks2/core"
 	log "github.com/sirupsen/logrus"
-	"net"
 )
 
 func (t *Tunnel) runClient() {
@@ -26,7 +24,7 @@ func (t *Tunnel) reloadClient() {
 			continue
 		}
 
-		handler, err := newTunnelHandler(t.conf.Server, tun, t.cipher)
+		handler, err := newTunnelHandler(t.conf, tun, t.cipher)
 		if err != nil {
 			log.Errorf("invalid tunnel %s", tun)
 			continue
@@ -58,32 +56,37 @@ func (t *Tunnel) reloadClient() {
 }
 
 type tunnelHandlerImpl struct {
-	tunnel     string
+	cipher sscore.Cipher
+	stopCh chan int
+	tunnel string
+
+	// configs
 	serverAddr string
 	protocol   string
 	listen     string
 	target     string
-	cipher     sscore.Cipher
-	stopCh     chan int
+	corking    bool
 }
 
 func (t *tunnelHandlerImpl) GetDefinition() string {
 	return t.tunnel
 }
 
-func newTunnelHandler(serverAddr string, tun string, cipher sscore.Cipher) (tunnelHandler, error) {
+func newTunnelHandler(conf *config.Config, tun string, cipher sscore.Cipher) (tunnelHandler, error) {
 	protocol, listen, target, err := config.ParseTunnel(tun)
 	if err != nil { // should already be validated in config.CreateConfigOrDie
 		return nil, err
 	}
 	return &tunnelHandlerImpl{
-		tunnel:     tun,
-		serverAddr: serverAddr,
+		cipher: cipher,
+		stopCh: make(chan int, 1),
+		tunnel: tun,
+
+		serverAddr: conf.Server,
 		protocol:   protocol,
 		listen:     listen,
 		target:     target,
-		cipher:     cipher,
-		stopCh:     make(chan int, 1),
+		corking:    conf.Cork,
 	}, nil
 }
 
@@ -91,10 +94,10 @@ var _ tunnelHandler = &tunnelHandlerImpl{}
 
 func (t *tunnelHandlerImpl) Start() {
 	switch t.protocol {
-	case "tcp":
-		t.startTcpTunnel()
-	case "udp":
-		t.startUdpTunnel()
+	case proto.Tcp, proto.Unix:
+		t.runStreamTunnel()
+	case proto.Udp, proto.UnixGram:
+		t.runPacketTunnel()
 	default:
 		log.Errorf("Invalid protocol %s", t.protocol)
 	}
@@ -102,65 +105,4 @@ func (t *tunnelHandlerImpl) Start() {
 
 func (t *tunnelHandlerImpl) Stop() {
 	t.stopCh <- 0
-}
-
-// reference: github.com/shadowsocks/go-shadowsocks2/tcp.go tcpLocal
-func (t *tunnelHandlerImpl) startTcpTunnel() {
-	listener, err := net.Listen(t.protocol, t.listen)
-	if err != nil {
-		log.Errorf("Failed to listen on %s: %v", t.listen, err)
-		return
-	}
-	defer doClose(listener)
-	log.Infof("TCP tunnel start: -> %s -> %s -> %s", t.listen, t.serverAddr, t.target)
-	go func() {
-		<-t.stopCh
-		doClose(listener)
-	}()
-
-	head := header.Header{
-		Protocol: t.protocol,
-		Target:   t.target,
-	}
-
-	for {
-		cliConn, err := listener.Accept()
-		if err != nil {
-			log.Errorf("Failed to accept: %v", err)
-			continue
-		}
-
-		log.Infof("Accepted connection from %s", cliConn.RemoteAddr())
-
-		go func() {
-			defer doClose(cliConn)
-			log.Infof("Dial server %s start", t.serverAddr)
-			svrConn, err := net.Dial("tcp", t.serverAddr)
-			if err != nil {
-				log.Errorf("Failed to connect to server %s: %v", t.serverAddr, err)
-				return
-			}
-			defer doClose(svrConn)
-			log.Infof("Dial server %s done", t.serverAddr)
-
-			// TODO: TCP cork support
-			svrConn = conn.NewEncryptedStreamConn(svrConn.(conn.StreamConn), t.cipher)
-
-			if err = head.MarshalTo(svrConn); err != nil {
-				log.Errorf("Failed to write header: %v", err)
-				return
-			}
-
-			log.Infof("TCP relay start: %s <-[ %s <-> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
-			relayConnection(cliConn, svrConn)
-			log.Infof("TCP relay end: %s <-[ %s <-> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
-		}()
-	}
-
-}
-
-// reference: github.com/shadowsocks/go-shadowsocks2/udp.go udpLocal
-func (t *tunnelHandlerImpl) startUdpTunnel() {
-	// TODO
-	log.Errorf("UDP tunnel has not implemented yet")
 }

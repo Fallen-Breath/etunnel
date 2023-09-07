@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"os"
+	"strings"
 )
 
 func CreateConfigOrDie() *Config {
@@ -14,11 +15,17 @@ func CreateConfigOrDie() *Config {
 
 	help := flag.Bool("h", false, "Show help and exit")
 	configPath := flag.String("conf", "", "Set the file to load config from. Existing arguments from command line will be override")
+
 	flag.StringVar(&conf.Mode, "m", "", "The mode of etunnel. Options: client, server")
-	flag.StringVar(&conf.Crypt, "c", Crypts[0], "The encryption method to use")
+	flag.StringVar(&conf.Crypt, "c", Crypts[0], "The encryption method to use. Options: "+strings.Join(Crypts, ", "))
 	flag.StringVar(&conf.Key, "k", "hidden secret", "The secret password for encryption")
+	flag.BoolVar(&conf.Cork, "cork", false, "Enable tcp corking")
+	flag.BoolVar(&conf.Debug, "debug", false, "Enable debug logging")
+
 	flag.StringVar(&conf.Server, "s", "127.0.0.1:12000", "(client) The address of the etunnel server")
 	flag.Var(&conf.Tunnels, "t", "(client) A list of encrypted tunnels")
+	flag.StringVar(&conf.PidFile, "pid-file", "", "(client) Path to store the pid file, linux only")
+
 	flag.StringVar(&conf.Listen, "l", "127.0.0.1:12000", "(server) The address to listen to")
 
 	flag.Parse()

@@ -11,3 +11,7 @@ type StreamConn interface {
 	net.Conn
 	ReadWriteClosable
 }
+
+type PacketConn interface {
+	net.PacketConn
+}
