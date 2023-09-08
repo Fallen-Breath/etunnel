@@ -30,7 +30,8 @@ type cliFlags struct {
 	Tunnels []string
 
 	// config - tool
-	Pid int
+	ToolPid    int
+	ToolReload bool
 }
 
 func CliEntry() *Config {
@@ -43,7 +44,7 @@ func CliEntry() *Config {
 			flags.Mode = modeRoot
 		},
 	}
-	rootCmd.Flags().StringVar(&flags.ConfigPath, "conf", "", "Set the file to load config from. Arguments from command line will be ignored")
+	rootCmd.Flags().StringVarP(&flags.ConfigPath, "conf", "c", "", "Set the file to load config from. Arguments from command line will be ignored")
 	rootCmd.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "Enable debug logging")
 
 	addTunnelFlags := func(fs *pflag.FlagSet) {
@@ -85,7 +86,8 @@ func CliEntry() *Config {
 		},
 	}
 	rootCmd.AddCommand(toolCmd)
-	toolCmd.Flags().IntVarP(&flags.Pid, "pid", "p", 0, "The pid of the etunnel process to interact with")
+	toolCmd.Flags().IntVarP(&flags.ToolPid, "pid", "p", 0, "The pid of the etunnel process to interact with")
+	toolCmd.Flags().BoolVarP(&flags.ToolReload, "reload", "r", false, "Trigger a config reload. For etunnel client only")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatalf("Execute command failed: %v", err)

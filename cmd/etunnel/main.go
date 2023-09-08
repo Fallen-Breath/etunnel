@@ -22,6 +22,6 @@ func main() {
 		tun.Run()
 
 	case config.ModeTool:
-		tool.RunTools(conf)
+		tool.RunTools(conf.ToolConf)
 	}
 }

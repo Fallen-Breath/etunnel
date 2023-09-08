@@ -38,7 +38,8 @@ func LoadConfigFromFlags(flags *cliFlags) (*Config, error) {
 		}
 		conf.Server = flags.Server
 	case ModeTool:
-		// TODO
+		conf.ToolConf.Pid = flags.ToolPid
+		conf.ToolConf.Reload = flags.ToolReload
 	}
 	return conf, nil
 }
@@ -94,6 +95,9 @@ func ValidateConfig(conf *Config) error {
 			}
 		}
 	case ModeTool:
+		if conf.ToolConf.Pid == 0 {
+			return errors.New("pid unset")
+		}
 	}
 
 	return nil

@@ -21,8 +21,8 @@ Notes that this tool only provides the tunneling functionality, it cannot be use
 ### Config Mode
 
 ```bash
-./etunnel --conf etunnel_server.yml
-./etunnel --conf etunnel_client.yml
+./etunnel -c etunnel_server.yml
+./etunnel -c etunnel_client.yml
 ```
 
 ```yaml

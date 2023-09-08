@@ -1,10 +1,15 @@
 package tunnel
 
 import (
+	"fmt"
 	"github.com/Fallen-Breath/etunnel/internal/config"
+	"github.com/Fallen-Breath/etunnel/internal/conn"
 	"github.com/Fallen-Breath/etunnel/internal/proto"
+	"github.com/Fallen-Breath/etunnel/internal/proto/header"
 	sscore "github.com/shadowsocks/go-shadowsocks2/core"
 	log "github.com/sirupsen/logrus"
+	"net"
+	"time"
 )
 
 func (t *Tunnel) runClient() {
@@ -97,4 +102,28 @@ func (t *tunnelHandlerImpl) Start() {
 
 func (t *tunnelHandlerImpl) Stop() {
 	t.stopCh <- 0
+}
+
+func (t *tunnelHandlerImpl) connectToServer(head *header.Header) (svrConn conn.StreamConn, err error) {
+	sc, err := net.Dial("tcp", t.serverAddr)
+	if err != nil {
+		return nil, fmt.Errorf("dial %s failed: %v", t.serverAddr, err)
+	}
+	svrConn = sc.(conn.StreamConn)
+	defer func() {
+		if err != nil {
+			_ = svrConn.Close()
+		}
+	}()
+
+	if t.corking {
+		svrConn = conn.NewTimedCorkConn(svrConn, 10*time.Millisecond, 1280)
+	}
+	svrConn = conn.NewEncryptedStreamConn(svrConn, t.cipher)
+
+	if err = head.MarshalTo(svrConn); err != nil {
+		return nil, fmt.Errorf("send header failed: %v", err)
+	}
+
+	return svrConn, nil
 }

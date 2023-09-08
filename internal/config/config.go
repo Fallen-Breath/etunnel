@@ -30,7 +30,12 @@ type Config struct {
 	Server  string   `yaml:"server,omitempty"`
 
 	// tool
-	Pid int `yaml:"-"`
+	ToolConf *ToolConfig `yaml:"-"`
+}
+
+type ToolConfig struct {
+	Pid    int
+	Reload bool
 }
 
 func (t *Tunnel) GetDefinition() string {

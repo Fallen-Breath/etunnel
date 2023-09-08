@@ -55,10 +55,10 @@ func (t *Tunnel) Run() {
 	go func() {
 		for {
 			switch <-reloadCh {
-			case syscall.SIGHUP:
+			case constants.SignalReload:
 				log.Infof("%s reloading", constants.Name)
 				t.Reload()
-			case syscall.SIGTERM:
+			case nil:
 				return
 			}
 		}
@@ -66,7 +66,7 @@ func (t *Tunnel) Run() {
 
 	sig := <-stopCh
 	log.Infof("Terminating by signal %s", sig)
-	reloadCh <- syscall.SIGTERM
+	reloadCh <- nil
 	t.Stop()
 	log.Infof("%s stopped", constants.Name)
 }

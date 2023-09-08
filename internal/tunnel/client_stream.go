@@ -6,7 +6,6 @@ import (
 	"github.com/Fallen-Breath/etunnel/internal/proto/header"
 	log "github.com/sirupsen/logrus"
 	"net"
-	"time"
 )
 
 // reference: github.com/shadowsocks/go-shadowsocks2/tcp.go tcpLocal
@@ -23,7 +22,7 @@ func (t *tunnelHandlerImpl) runStreamTunnel() {
 		_ = listener.Close()
 	}()
 
-	id := 0
+	cid := 0
 	for {
 		cliConn, err := listener.Accept()
 		if err != nil {
@@ -33,41 +32,28 @@ func (t *tunnelHandlerImpl) runStreamTunnel() {
 
 		t.logger.Debugf("Accepted connection from %s", cliConn.RemoteAddr())
 
-		go t.handleStreamConnection(cliConn.(conn.StreamConn), t.logger.WithField("id", id))
-		id++
+		go t.handleStreamConnection(cliConn.(conn.StreamConn), t.logger.WithField("cid", cid))
+		cid++
 	}
 }
 
 func (t *tunnelHandlerImpl) handleStreamConnection(cliConn conn.StreamConn, logger *log.Entry) {
 	defer func() { _ = cliConn.Close() }()
 
-	sc, err := net.Dial("tcp", t.serverAddr)
-	if err != nil {
-		logger.Errorf("Failed to connect to server %s: %v", t.serverAddr, err)
-		return
-	}
-	svrConn := sc.(conn.StreamConn)
-	defer func() { _ = svrConn.Close() }()
-
-	if t.corking {
-		svrConn = conn.NewTimedCorkConn(svrConn, 10*time.Millisecond, 1280)
-	}
-	svrConn = conn.NewEncryptedStreamConn(svrConn, t.cipher)
-
 	head := header.Header{
 		Protocol: t.tunnel.Protocol,
 		Target:   t.tunnel.Target,
 	}
-	if err = head.MarshalTo(svrConn); err != nil {
-		logger.Errorf("Failed to write header: %v", err)
-		return
+	svrConn, err := t.connectToServer(&head)
+	if err != nil {
+		logger.Errorf("Failed to connect to the server: %v", err)
 	}
 
-	logger.Infof("Relay start: %s -[ %s -> %s ]-> %s", cliConn.RemoteAddr(), t.tunnel.Listen, t.serverAddr, t.tunnel.Target)
+	logger.Infof("Relay start: %s --[ %s -> %s ]-> %s", cliConn.RemoteAddr(), t.tunnel.Listen, t.serverAddr, t.tunnel.Target)
 	send, recv := relayConnection(cliConn, svrConn, logger)
 	flow := ""
 	if logger.Level >= log.DebugLevel {
 		flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
 	}
-	logger.Infof("Relay end: %s -[ %s -> %s ]-> %s%s", cliConn.RemoteAddr(), t.tunnel.Target, t.serverAddr, t.tunnel.Target, flow)
+	logger.Infof("Relay end: %s --[ %s -> %s ]-> %s%s", cliConn.RemoteAddr(), t.tunnel.Target, t.serverAddr, t.tunnel.Target, flow)
 }
