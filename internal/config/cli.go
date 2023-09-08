@@ -16,11 +16,11 @@ type cliFlags struct {
 	Debug      bool
 
 	// config common
-	Mode      string
-	Crypt     string
-	Key       string
-	Cork      bool
-	GenConfig string
+	Mode         string
+	Crypt        string
+	Key          string
+	Cork         bool
+	ExportConfig string
 
 	// config - server
 	Listen string
@@ -44,7 +44,7 @@ func CliEntry() *Config {
 			flags.Mode = modeRoot
 		},
 	}
-	rootCmd.Flags().StringVarP(&flags.ConfigPath, "conf", "c", "", "Set the file to load config from. Arguments from command line will be ignored")
+	rootCmd.Flags().StringVarP(&flags.ConfigPath, "conf", "c", "", "Ptah to the yaml config file. Arguments from command line will be ignored")
 	rootCmd.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "Enable debug logging")
 
 	addTunnelFlags := func(fs *pflag.FlagSet) {
@@ -52,7 +52,7 @@ func CliEntry() *Config {
 		fs.StringVarP(&flags.Crypt, "crypt", "c", Crypts[0], "The encryption method to use. Options: "+strings.Join(Crypts, ", "))
 		fs.StringVarP(&flags.Key, "key", "k", "hidden secret", "The secret password for encryption")
 		fs.BoolVar(&flags.Cork, "cork", false, "Enable tcp corking")
-		fs.StringVar(&flags.GenConfig, "gen-config", "", "Generate config file from the CLI arguments to the given file")
+		fs.StringVar(&flags.ExportConfig, "export", "", "Export CLI arguments to the given yaml config file")
 	}
 
 	var serverCmd = &cobra.Command{
@@ -104,11 +104,11 @@ func CliEntry() *Config {
 	}
 
 	conf := generateConfigOrDie(&flags)
-	if len(flags.GenConfig) > 0 {
-		if err := WriteConfigToFile(conf, flags.GenConfig); err != nil {
-			log.Fatalf("Generate config file failed: %v", err)
+	if len(flags.ExportConfig) > 0 {
+		if err := WriteConfigToFile(conf, flags.ExportConfig); err != nil {
+			log.Fatalf("Export config file failed: %v", err)
 		}
-		log.Infof("Generated config file to %s", flags.GenConfig)
+		log.Infof("Exported config file to %s", flags.ExportConfig)
 		os.Exit(0)
 	}
 	return conf

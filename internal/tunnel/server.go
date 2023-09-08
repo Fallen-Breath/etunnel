@@ -53,6 +53,7 @@ func (t *Tunnel) runServer() {
 func (t *Tunnel) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 	defer func() { _ = cliConn.Close() }()
 	originConn := cliConn
+	_ = originConn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	if t.conf.Cork {
 		cliConn = conn.NewTimedCorkConn(cliConn, 10*time.Millisecond, 1280)
@@ -64,13 +65,12 @@ func (t *Tunnel) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 		logger.Errorf("Failed to read header: %v", err)
 		// drain originConn to avoid leaking server behavioral features
 		// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
-		_ = originConn.SetDeadline(time.Now().Add(30 * time.Second)) // TODO: find a nice way to close connection
-		_, err = io.Copy(io.Discard, originConn)
-		if err != nil {
+		if _, err = io.Copy(io.Discard, originConn); err != nil {
 			logger.Errorf("Discard error: %v", err)
 		}
 		return
 	}
+	_ = originConn.SetDeadline(time.Time{})
 
 	target := head.Target
 	targetConn, err := net.Dial(head.Protocol, target)
@@ -85,13 +85,13 @@ func (t *Tunnel) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 	switch head.Protocol {
 	case proto.Tcp:
 		send, recv := relayConnection(cliConn, targetConn, logger)
-		if logger.Level >= log.DebugLevel {
+		if log.GetLevel() >= log.DebugLevel {
 			flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
 		}
 
 	case proto.Udp:
 		size := relayUdpConnection(cliConn, targetConn, logger)
-		if logger.Level >= log.DebugLevel {
+		if log.GetLevel() >= log.DebugLevel {
 			flow = fmt.Sprintf(" (packet size %d)", size)
 		}
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
@@ -104,11 +105,13 @@ func ValidateConfig(conf *Config) error {
 }
 
 func WriteConfigToFile(conf *Config, configPath string) error {
-	buf, err := yaml.Marshal(conf)
-	if err != nil {
+	var buf bytes.Buffer
+	yamlEncoder := yaml.NewEncoder(&buf)
+	yamlEncoder.SetIndent(2)
+	if err := yamlEncoder.Encode(&conf); err != nil {
 		return err
 	}
-	if err := os.WriteFile(configPath, buf, 0644); err != nil {
+	if err := os.WriteFile(configPath, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write config file %s: %v", configPath, err)
 	}
 	return nil

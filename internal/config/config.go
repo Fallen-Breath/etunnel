@@ -16,7 +16,7 @@ type Tunnel struct {
 type Config struct {
 	// common
 	Mode  string `yaml:"mode"`
-	Debug bool   `yaml:"debug,omitempty"`
+	Debug bool   `yaml:"debug"`
 
 	Crypt string `yaml:"crypt"`
 	Key   string `yaml:"key"`
@@ -26,8 +26,8 @@ type Config struct {
 	Listen string `yaml:"listen,omitempty"`
 
 	// client
-	Tunnels []Tunnel `yaml:"tunnels,omitempty"`
 	Server  string   `yaml:"server,omitempty"`
+	Tunnels []Tunnel `yaml:"tunnels,omitempty"`
 
 	// tool
 	ToolConf *ToolConfig `yaml:"-"`
@@ -61,6 +61,4 @@ func (c *Config) Apply() {
 	} else {
 		log.SetLevel(log.InfoLevel)
 	}
-
-	log.StandardLogger().SetFormatter(&log.TextFormatter{TimestampFormat: "2006-01-02 15:04:05.000"})
 }

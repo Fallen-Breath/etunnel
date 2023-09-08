@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	initLog()
 	conf := config.CliEntry()
 	conf.Apply()
 
@@ -24,4 +25,8 @@ func main() {
 	case config.ModeTool:
 		tool.RunTools(conf.ToolConf)
 	}
+}
+
+func initLog() {
+	log.StandardLogger().SetFormatter(&log.TextFormatter{TimestampFormat: "2006-01-02 15:04:05.000"})
 }

@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -31,7 +32,7 @@ type tunnelHandler interface {
 }
 
 func NewTunnel(conf *config.Config) (*Tunnel, error) {
-	cipher, err := sscore.PickCipher(conf.Crypt, []byte{}, conf.Key)
+	cipher, err := sscore.PickCipher(strings.ToUpper(conf.Crypt), []byte{}, conf.Key)
 	if err != nil {
 		return nil, err
 	}
