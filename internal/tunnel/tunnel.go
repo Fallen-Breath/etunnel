@@ -88,7 +88,10 @@ func (t *Tunnel) Stop() {
 
 // Reload support reload clientside tunnels only
 func (t *Tunnel) Reload() {
-	if t.conf.Mode == config.ModeClient {
+	switch t.conf.Mode {
+	case config.ModeServer:
+		log.Warningf("Reload action ignored, etunnel server doesn't support that")
+	case config.ModeClient:
 		t.reloadClient()
 	}
 }

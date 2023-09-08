@@ -9,7 +9,7 @@ import (
 )
 
 func LoadConfigFromFlags(flags *cliFlags) (*Config, error) {
-	conf := &Config{}
+	conf := &Config{ToolConf: &ToolConfig{}}
 	conf.Mode = flags.Mode
 	conf.Debug = flags.Debug
 

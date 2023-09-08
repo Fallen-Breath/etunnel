@@ -6,6 +6,7 @@ import (
 	"github.com/Fallen-Breath/etunnel/internal/tool"
 	"github.com/Fallen-Breath/etunnel/internal/tunnel"
 	log "github.com/sirupsen/logrus"
+	"os"
 )
 
 func main() {
@@ -15,7 +16,7 @@ func main() {
 
 	switch conf.Mode {
 	case config.ModeServer, config.ModeClient:
-		log.Infof("%s v%s starting, mode %s", constants.Name, constants.Version, conf.Mode)
+		log.Infof("%s v%s starting, mode %s, pid %d", constants.Name, constants.Version, conf.Mode, os.Getpid())
 		tun, err := tunnel.NewTunnel(conf)
 		if err != nil {
 			log.Fatalf("Failed to initialize %s: %v", constants.Name, err)
