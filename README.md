@@ -19,8 +19,10 @@ Notes that this tool only provides the tunneling functionality, it cannot be use
 ./etunnel server -c AES-128-GCM -k my_secret_key -l :12000
 # client
 ./etunnel client -c AES-128-GCM -k my_secret_key -s 192.168.1.1:12000 \
-  -t tcp://127.0.0.1:2222/127.0.0.1:22 \
-  -t tcp://:8000/10.10.10.1:8080
+    -t tcp://127.0.0.1:2222/127.0.0.1:22 \
+    -t tcp://:8000/10.10.10.1:8080
+# tool
+./etunnel tool -p 5132 --reload
 ```
 
 Tunnel definition format: `protocol://listen/target`, where:
