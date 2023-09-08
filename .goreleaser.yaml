@@ -3,7 +3,7 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - main: github.com/Fallen-Breath/etunnel/cmd/etunnel
+  - main: ./cmd/etunnel
     binary: etunnel
     env:
       - CGO_ENABLED=0
