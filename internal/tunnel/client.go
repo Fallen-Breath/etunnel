@@ -18,8 +18,8 @@ func (t *Tunnel) reloadClient() {
 
 	expectedTunnels := make(map[string]bool)
 	for _, tun := range t.conf.Tunnels {
-		expectedTunnels[tun] = true
-		if _, ok := t.cliHandlers[tun]; ok {
+		expectedTunnels[tun.GetDefinition()] = true
+		if _, ok := t.cliHandlers[tun.GetDefinition()]; ok {
 			// already exists, skipped
 			continue
 		}
@@ -30,9 +30,9 @@ func (t *Tunnel) reloadClient() {
 			continue
 		}
 
-		log.Infof("Creating tunnel %s", tun)
+		log.Infof("Creating tunnel %+v", tun)
 		t.cliWg.Add(1)
-		t.cliHandlers[tun] = handler
+		t.cliHandlers[tun.GetDefinition()] = handler
 		go func() {
 			defer t.cliWg.Done()
 			handler.Start()
@@ -58,34 +58,24 @@ func (t *Tunnel) reloadClient() {
 type tunnelHandlerImpl struct {
 	cipher sscore.Cipher
 	stopCh chan int
-	tunnel string
+	tunnel config.Tunnel
 
 	// configs
 	serverAddr string
-	protocol   string
-	listen     string
-	target     string
 	corking    bool
 }
 
 func (t *tunnelHandlerImpl) GetDefinition() string {
-	return t.tunnel
+	return t.tunnel.GetDefinition()
 }
 
-func newTunnelHandler(conf *config.Config, tun string, cipher sscore.Cipher) (tunnelHandler, error) {
-	protocol, listen, target, err := config.ParseTunnel(tun)
-	if err != nil { // should already be validated in config.CreateConfigOrDie
-		return nil, err
-	}
+func newTunnelHandler(conf *config.Config, tun config.Tunnel, cipher sscore.Cipher) (tunnelHandler, error) {
 	return &tunnelHandlerImpl{
 		cipher: cipher,
 		stopCh: make(chan int, 1),
 		tunnel: tun,
 
 		serverAddr: conf.Server,
-		protocol:   protocol,
-		listen:     listen,
-		target:     target,
 		corking:    conf.Cork,
 	}, nil
 }
@@ -93,13 +83,13 @@ func newTunnelHandler(conf *config.Config, tun string, cipher sscore.Cipher) (tu
 var _ tunnelHandler = &tunnelHandlerImpl{}
 
 func (t *tunnelHandlerImpl) Start() {
-	switch t.protocol {
-	case proto.Tcp, proto.Unix:
+	switch t.tunnel.Protocol {
+	case proto.Tcp:
 		t.runStreamTunnel()
-	case proto.Udp, proto.UnixGram:
+	case proto.Udp:
 		t.runPacketTunnel()
 	default:
-		log.Errorf("Invalid protocol %s", t.protocol)
+		log.Errorf("Unsupported protocol %s", t.tunnel.Protocol)
 	}
 }
 

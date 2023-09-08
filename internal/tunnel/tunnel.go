@@ -2,9 +2,14 @@ package tunnel
 
 import (
 	"github.com/Fallen-Breath/etunnel/internal/config"
+	"github.com/Fallen-Breath/etunnel/internal/constants"
 	sscore "github.com/shadowsocks/go-shadowsocks2/core"
+	log "github.com/sirupsen/logrus"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
+	"syscall"
 )
 
 type Tunnel struct {
@@ -40,12 +45,38 @@ func NewTunnel(conf *config.Config) (*Tunnel, error) {
 	return t, nil
 }
 
+func (t *Tunnel) Run() {
+	reloadCh := make(chan os.Signal, 1)
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(reloadCh, syscall.SIGHUP)
+
+	go t.Start()
+	go func() {
+		for {
+			switch <-reloadCh {
+			case syscall.SIGHUP:
+				log.Infof("%s reloading", constants.Name)
+				t.Reload()
+			case syscall.SIGTERM:
+				return
+			}
+		}
+	}()
+
+	sig := <-stopCh
+	log.Infof("Terminating by signal %s", sig)
+	reloadCh <- syscall.SIGTERM
+	t.Stop()
+	log.Infof("%s stopped", constants.Name)
+}
+
 func (t *Tunnel) Start() {
 	switch t.conf.Mode {
-	case config.ModeClient:
-		t.runClient()
 	case config.ModeServer:
 		t.runServer()
+	case config.ModeClient:
+		t.runClient()
 	}
 }
 

@@ -1,7 +1,8 @@
 /.idea
 /.vscode
 
-config.yml
+etunnel_client.yml
+etunnel_server.yml
 
 dist/
 build/

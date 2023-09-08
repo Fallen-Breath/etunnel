@@ -12,13 +12,13 @@ func (t *tunnelHandlerImpl) runPacketTunnel() {
 		return
 	}
 
-	listener, err := net.ListenPacket(t.protocol, t.listen)
+	listener, err := net.ListenPacket(t.tunnel.Protocol, t.tunnel.Listen)
 	if err != nil {
-		log.Errorf("Failed to listen on %s: %v", t.listen, err)
+		log.Errorf("Failed to listen on %s: %v", t.tunnel.Listen, err)
 		return
 	}
 	defer func() { _ = listener.Close() }()
-	log.Infof("Packet tunnel (%s) start: -> %s -> %s -> %s", t.protocol, t.listen, t.serverAddr, t.target)
+	log.Infof("Packet tunnel (%s) start: -> %s -> %s -> %s", t.tunnel.Protocol, t.tunnel.Listen, t.serverAddr, t.tunnel.Target)
 	go func() {
 		<-t.stopCh
 		_ = listener.Close()

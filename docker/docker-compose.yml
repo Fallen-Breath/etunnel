@@ -1,0 +1,9 @@
+version: '3'
+services:
+  etunnel:
+    image: fallenbreath/etunnel
+    container_name: etunnel_server
+    restart: unless-stopped
+    command: 'server -h'
+    ports:
+      - "12000:12000"

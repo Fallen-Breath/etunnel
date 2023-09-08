@@ -38,7 +38,7 @@ func (h *Header) MarshalTo(writer io.Writer) error {
 	case proto.Udp:
 		magic |= pUdp
 		targetPacker = packAddress
-	case proto.Unix:
+	case "unix__unsupported_yet":
 		magic |= pUnix
 		targetPacker = packString
 	default:
@@ -83,8 +83,9 @@ func (h *Header) UnmarshalFrom(reader io.Reader) error {
 		h.Protocol = proto.Udp
 		targetReader = readAddress
 	case pUnix:
-		h.Protocol = proto.Unix
+		//h.Protocol = proto.Unix
 		targetReader = readString
+		fallthrough
 	default:
 		return fmt.Errorf("unsupported protocol type %d", protocolType)
 	}

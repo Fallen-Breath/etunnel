@@ -2,82 +2,86 @@ package config
 
 import (
 	"errors"
-	"flag"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"os"
-	"strings"
 )
 
-func CreateConfigOrDie() *Config {
+func LoadConfigFromFlags(flags *cliFlags) (*Config, error) {
 	conf := &Config{}
+	conf.Mode = flags.Mode
+	conf.Debug = flags.Debug
 
-	help := flag.Bool("h", false, "Show help and exit")
-	configPath := flag.String("conf", "", "Set the file to load config from. Existing arguments from command line will be override")
-
-	flag.StringVar(&conf.Mode, "m", "", "The mode of etunnel. Options: client, server")
-	flag.StringVar(&conf.Crypt, "c", Crypts[0], "The encryption method to use. Options: "+strings.Join(Crypts, ", "))
-	flag.StringVar(&conf.Key, "k", "hidden secret", "The secret password for encryption")
-	flag.BoolVar(&conf.Cork, "cork", false, "Enable tcp corking")
-	flag.BoolVar(&conf.Debug, "debug", false, "Enable debug logging")
-
-	flag.StringVar(&conf.Server, "s", "127.0.0.1:12000", "(client) The address of the etunnel server")
-	flag.Var(&conf.Tunnels, "t", "(client) A list of encrypted tunnels")
-	flag.StringVar(&conf.PidFile, "pid-file", "", "(client) Path to store the pid file, linux only")
-
-	flag.StringVar(&conf.Listen, "l", "127.0.0.1:12000", "(server) The address to listen to")
-
-	flag.Parse()
-
-	if *help {
-		flag.Usage()
-		os.Exit(0)
+	loadTunnelCommon := func() {
+		conf.Crypt = flags.Crypt
+		conf.Key = flags.Key
+		conf.Cork = flags.Cork
 	}
 
-	if len(*configPath) > 0 {
-		if err := readConfig(conf, *configPath); err != nil {
-			log.Fatalf("Read config file failed: %v", err)
+	switch conf.Mode {
+	case ModeServer:
+		loadTunnelCommon()
+		conf.Listen = flags.Listen
+	case ModeClient:
+		loadTunnelCommon()
+		for i, tunStr := range flags.Tunnels {
+			protocol, listen, target, err := ParseTunnel(tunStr)
+			if err != nil {
+				return nil, err
+			}
+			conf.Tunnels = append(conf.Tunnels, Tunnel{
+				Name:     fmt.Sprintf("Tunnel_%d", i),
+				Protocol: protocol.Name,
+				Listen:   listen,
+				Target:   target,
+			})
 		}
-		log.Infof("Loaded config from %s", *configPath)
+		conf.Server = flags.Server
+	case ModeTool:
+		// TODO
 	}
-
-	if err := validateConfig(conf); err != nil {
-		log.Fatalf("Validate config failed: %v", err)
-	}
-
-	return conf
+	return conf, nil
 }
 
-func readConfig(config *Config, configPath string) error {
+func LoadConfigFromFile(configPath string) (*Config, error) {
+	conf := &Config{}
 	buf, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to read config file %s: %v", configPath, err)
+		return nil, fmt.Errorf("failed to read config file %s: %v", configPath, err)
 	}
-	if err := yaml.Unmarshal(buf, &config); err != nil {
-		return fmt.Errorf("failed to parse yaml from config file %s: %v", configPath, err)
+	if err := yaml.Unmarshal(buf, conf); err != nil {
+		return nil, fmt.Errorf("failed to parse yaml from config file %s: %v", configPath, err)
 	}
-	return nil
+	return conf, nil
 }
 
-func validateConfig(conf *Config) error {
+func ValidateConfig(conf *Config) error {
 	if len(conf.Mode) == 0 {
 		return errors.New("missing mode")
 	}
-	if conf.Mode != ModeClient && conf.Mode != ModeServer {
-		return fmt.Errorf("invalid mode '%s'", conf.Mode)
-	}
-	if err := ValidateCrypt(conf.Crypt); err != nil {
-		return err
-	}
-	if len(conf.Key) == 0 {
-		return fmt.Errorf("empty key")
-	}
-	if err := ValidateAddress(conf.Listen); err != nil {
-		return err
+
+	validateTunnelCommon := func() error {
+		if err := ValidateCrypt(conf.Crypt); err != nil {
+			return err
+		}
+		if len(conf.Key) == 0 {
+			return fmt.Errorf("empty key")
+		}
+		return nil
 	}
 
-	if conf.Mode == ModeClient {
+	switch conf.Mode {
+	case ModeServer:
+		if err := validateTunnelCommon(); err != nil {
+			return err
+		}
+		if err := ValidateAddress(conf.Listen); err != nil {
+			return fmt.Errorf("invalid listen adderss %s: %v", conf.Listen, err)
+		}
+	case ModeClient:
+		if err := validateTunnelCommon(); err != nil {
+			return err
+		}
 		if err := ValidateAddress(conf.Server); err != nil {
 			return fmt.Errorf("invalid server adderss %s: %v", conf.Server, err)
 		}
@@ -85,15 +89,11 @@ func validateConfig(conf *Config) error {
 			return errors.New("no tunnels are defined")
 		}
 		for _, t := range conf.Tunnels {
-			if err := ValidateTunnel(t); err != nil {
+			if err := t.Validate(); err != nil {
 				return fmt.Errorf("invalid tunnel definition %s: %v", t, err)
 			}
 		}
-	}
-	if conf.Mode == ModeServer {
-		if err := ValidateAddress(conf.Listen); err != nil {
-			return fmt.Errorf("invalid listen adderss %s: %v", conf.Listen, err)
-		}
+	case ModeTool:
 	}
 
 	return nil

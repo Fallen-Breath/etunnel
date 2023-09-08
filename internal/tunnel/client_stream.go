@@ -11,13 +11,13 @@ import (
 
 // reference: github.com/shadowsocks/go-shadowsocks2/tcp.go tcpLocal
 func (t *tunnelHandlerImpl) runStreamTunnel() {
-	listener, err := net.Listen(t.protocol, t.listen)
+	listener, err := net.Listen(t.tunnel.Protocol, t.tunnel.Listen)
 	if err != nil {
-		log.Errorf("Failed to listen on %s: %v", t.listen, err)
+		log.Errorf("Failed to listen on %s: %v", t.tunnel.Listen, err)
 		return
 	}
 	defer func() { _ = listener.Close() }()
-	log.Infof("Stream tunnel (%s) start: -> %s -> %s -> %s", t.protocol, t.listen, t.serverAddr, t.target)
+	log.Infof("Stream tunnel (%s) start: -> %s -> %s -> %s", t.tunnel.Protocol, t.tunnel.Listen, t.serverAddr, t.tunnel.Target)
 	go func() {
 		<-t.stopCh
 		_ = listener.Close()
@@ -53,19 +53,19 @@ func (t *tunnelHandlerImpl) handleStreamConnection(cliConn conn.StreamConn) {
 	svrConn = conn.NewEncryptedStreamConn(svrConn, t.cipher)
 
 	head := header.Header{
-		Protocol: t.protocol,
-		Target:   t.target,
+		Protocol: t.tunnel.Protocol,
+		Target:   t.tunnel.Target,
 	}
 	if err = head.MarshalTo(svrConn); err != nil {
 		log.Errorf("Failed to write header: %v", err)
 		return
 	}
 
-	log.Infof("Relay start: %s -[ %s -> %s ]-> %s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target)
+	log.Infof("Relay start: %s -[ %s -> %s ]-> %s", cliConn.RemoteAddr(), t.tunnel.Listen, t.serverAddr, t.tunnel.Target)
 	send, recv := relayConnection(cliConn, svrConn)
 	flow := ""
 	if log.StandardLogger().Level >= log.DebugLevel {
 		flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
 	}
-	log.Infof("Relay end: %s -[ %s -> %s ]-> %s%s", cliConn.RemoteAddr(), t.listen, t.serverAddr, t.target, flow)
+	log.Infof("Relay end: %s -[ %s -> %s ]-> %s%s", cliConn.RemoteAddr(), t.tunnel.Target, t.serverAddr, t.tunnel.Target, flow)
 }

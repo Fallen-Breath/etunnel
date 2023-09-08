@@ -15,7 +15,8 @@ import (
 func (t *Tunnel) runServer() {
 	listener, err := net.Listen("tcp", t.conf.Listen)
 	if err != nil {
-		log.Errorf("failed to listen on %s: %v", t.conf.Listen, err)
+		// server fails hard
+		log.Fatalf("failed to listen on %s: %v", t.conf.Listen, err)
 		return
 	}
 
@@ -81,5 +82,4 @@ func (t *Tunnel) handleConnection(cliConn conn.StreamConn) {
 		flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
 	}
 	log.Infof("Relay end %s -> %s%s", cliConn.RemoteAddr(), target, flow)
-
 }
