@@ -30,7 +30,7 @@ func LoadConfigFromFlags(flags *cliFlags) (*Config, error) {
 				return nil, err
 			}
 			conf.Tunnels = append(conf.Tunnels, Tunnel{
-				Name:     fmt.Sprintf("Tunnel_%d", i),
+				Name:     fmt.Sprintf("Tunnel-%d", i),
 				Protocol: protocol.Name,
 				Listen:   listen,
 				Target:   target,
@@ -96,5 +96,16 @@ func ValidateConfig(conf *Config) error {
 	case ModeTool:
 	}
 
+	return nil
+}
+
+func WriteConfigToFile(conf *Config, configPath string) error {
+	buf, err := yaml.Marshal(conf)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(configPath, buf, 0644); err != nil {
+		return fmt.Errorf("failed to write config file %s: %v", configPath, err)
+	}
 	return nil
 }

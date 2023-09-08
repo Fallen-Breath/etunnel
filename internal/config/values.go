@@ -12,6 +12,8 @@ const (
 	ModeServer = "server"
 	ModeClient = "client"
 	ModeTool   = "tool"
+
+	modeRoot = "root" // for root command
 )
 
 // Crypts values see github.com/shadowsocks/go-shadowsocks2/core/cipher.go PickCipher

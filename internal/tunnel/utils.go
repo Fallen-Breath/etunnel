@@ -8,15 +8,15 @@ import (
 	"sync"
 )
 
-func relayConnection(left, right net.Conn) (l2r int64, r2l int64) {
+func relayConnection(left, right net.Conn, logger *log.Entry) (l2r, r2l int64) {
 	var wg sync.WaitGroup
 
 	forward := func(source net.Conn, target net.Conn, name string, count *int64) {
 		defer wg.Done()
 
-		log.Debugf("Forward start %s", name)
+		logger.Debugf("Forward start %s", name)
 		n, err := io.Copy(target, source)
-		log.Debugf("Forward end %s %v", name, err)
+		logger.Debugf("Forward end %s %v", name, err)
 		*count = n
 
 		if err == nil { // source EOF, no more incoming data from source, so stop sending more data to target

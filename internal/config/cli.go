@@ -13,13 +13,14 @@ type cliFlags struct {
 	// CLI stuffs
 	Help       bool
 	ConfigPath string
+	Debug      bool
 
 	// config common
-	Mode  string
-	Crypt string
-	Key   string
-	Cork  bool
-	Debug bool
+	Mode      string
+	Crypt     string
+	Key       string
+	Cork      bool
+	GenConfig string
 
 	// config - server
 	Listen string
@@ -38,16 +39,19 @@ func CliEntry() *Config {
 		Use:     constants.Name,
 		Short:   constants.Description,
 		Version: constants.Version,
+		Run: func(cmd *cobra.Command, args []string) {
+			flags.Mode = modeRoot
+		},
 	}
-	rootCmd.Flags().BoolVar(&flags.Help, "h", false, "Show help and exit")
 	rootCmd.Flags().StringVar(&flags.ConfigPath, "conf", "", "Set the file to load config from. Arguments from command line will be ignored")
+	rootCmd.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "Enable debug logging")
 
 	addTunnelFlags := func(fs *pflag.FlagSet) {
 		fs.StringVarP(&flags.Mode, "mode", "m", "", "The mode of etunnel. Options: client, server")
 		fs.StringVarP(&flags.Crypt, "crypt", "c", Crypts[0], "The encryption method to use. Options: "+strings.Join(Crypts, ", "))
 		fs.StringVarP(&flags.Key, "key", "k", "hidden secret", "The secret password for encryption")
 		fs.BoolVar(&flags.Cork, "cork", false, "Enable tcp corking")
-		fs.BoolVar(&flags.Debug, "debug", false, "Enable debug logging")
+		fs.StringVar(&flags.GenConfig, "gen-config", "", "Generate config file from the CLI arguments to the given file")
 	}
 
 	var serverCmd = &cobra.Command{
@@ -86,11 +90,26 @@ func CliEntry() *Config {
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatalf("Execute command failed: %v", err)
 	}
+
+	// exit cuz the command has handled by the root command
 	if len(flags.Mode) == 0 {
 		os.Exit(0)
 	}
+	// if user didn't enter a subcommand and didn't give the config path
+	if flags.Mode == modeRoot && len(flags.ConfigPath) == 0 {
+		_ = rootCmd.Help()
+		os.Exit(0)
+	}
 
-	return generateConfigOrDie(&flags)
+	conf := generateConfigOrDie(&flags)
+	if len(flags.GenConfig) > 0 {
+		if err := WriteConfigToFile(conf, flags.GenConfig); err != nil {
+			log.Fatalf("Generate config file failed: %v", err)
+		}
+		log.Infof("Generated config file to %s", flags.GenConfig)
+		os.Exit(0)
+	}
+	return conf
 }
 
 func generateConfigOrDie(flags *cliFlags) *Config {

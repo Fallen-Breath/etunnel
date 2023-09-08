@@ -59,6 +59,7 @@ type tunnelHandlerImpl struct {
 	cipher sscore.Cipher
 	stopCh chan int
 	tunnel config.Tunnel
+	logger *log.Entry
 
 	// configs
 	serverAddr string
@@ -74,6 +75,7 @@ func newTunnelHandler(conf *config.Config, tun config.Tunnel, cipher sscore.Ciph
 		cipher: cipher,
 		stopCh: make(chan int, 1),
 		tunnel: tun,
+		logger: log.WithField("tunnel", tun.Name),
 
 		serverAddr: conf.Server,
 		corking:    conf.Cork,
@@ -89,7 +91,7 @@ func (t *tunnelHandlerImpl) Start() {
 	case proto.Udp:
 		t.runPacketTunnel()
 	default:
-		log.Errorf("Unsupported protocol %s", t.tunnel.Protocol)
+		t.logger.Errorf("Unsupported protocol %s", t.tunnel.Protocol)
 	}
 }
 

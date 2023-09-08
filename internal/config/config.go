@@ -16,17 +16,18 @@ type Tunnel struct {
 type Config struct {
 	// common
 	Mode  string `yaml:"mode"`
+	Debug bool   `yaml:"debug,omitempty"`
+
 	Crypt string `yaml:"crypt"`
 	Key   string `yaml:"key"`
-	Cork  bool   `yaml:"cork"`
-	Debug bool   `yaml:"debug"`
+	Cork  bool   `yaml:"cork,omitempty"`
 
 	// server
-	Listen string `yaml:"listen"`
+	Listen string `yaml:"listen,omitempty"`
 
 	// client
-	Tunnels []Tunnel `yaml:"tunnels"`
-	Server  string   `yaml:"server"`
+	Tunnels []Tunnel `yaml:"tunnels,omitempty"`
+	Server  string   `yaml:"server,omitempty"`
 
 	// tool
 	Pid int `yaml:"-"`

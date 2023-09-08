@@ -76,7 +76,7 @@ func (t *Tunnel) handleConnection(cliConn conn.StreamConn) {
 	defer func() { _ = targetConn.Close() }()
 
 	log.Infof("Relay start %s <-> %s", cliConn.RemoteAddr(), target)
-	send, recv := relayConnection(cliConn, targetConn)
+	send, recv := relayConnection(cliConn, targetConn, log.NewEntry(log.StandardLogger()))
 	flow := ""
 	if log.StandardLogger().Level >= log.DebugLevel {
 		flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
