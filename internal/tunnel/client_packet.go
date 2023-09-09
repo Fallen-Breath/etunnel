@@ -8,9 +8,9 @@ import (
 	"github.com/Fallen-Breath/etunnel/internal/proto/header"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -38,8 +38,11 @@ func (t *tunnelHandler) runPacketTunnel() {
 	}()
 
 	buf := make([]byte, proto.MaxUdpPacketSize)
-	connPool := &connectionPool{list: list.New()}
-	cid := 0
+	scPool := &serverConnectionPool{
+		list:   list.New(),
+		logger: t.logger,
+	}
+	var cid atomic.Uint64
 	for {
 		n, cliAddr, err := listener.ReadFrom(buf)
 		if err != nil {
@@ -53,19 +56,14 @@ func (t *tunnelHandler) runPacketTunnel() {
 			addr: cliAddr,
 		}
 
-		cid_ := cid
-		cid++
-		go t.handlePacketConnection(buf[:n], client, connPool, log.WithField("cid", cid_))
+		// TODO: use cliAddr as the key of the cached connection
+		// TODO: check if goroutine is necessary
+		go t.handlePacketConnection(buf[:n], client, scPool, t.logger.WithField("cid", cid.Add(1)))
 	}
 }
 
-func (t *tunnelHandler) handlePacketConnection(packet []byte, client *udpClient, pool *connectionPool, logger *log.Entry) {
-	length := len(packet)
-	if len(packet) > math.MaxUint16 {
-		logger.Errorf("UDP packet too large, %d > %d", length, math.MaxUint16)
-	}
-
-	holder, ok := pool.Pop()
+func (t *tunnelHandler) handlePacketConnection(packet []byte, client *udpClient, scPool *serverConnectionPool, logger *log.Entry) {
+	holder, ok := scPool.Pop()
 	if !ok {
 		svrConn, err := t.connectToServer(&header.ReqHead{
 			Kind: proto.KindPacket,
@@ -76,7 +74,8 @@ func (t *tunnelHandler) handlePacketConnection(packet []byte, client *udpClient,
 			return
 		}
 
-		holder = &connectionHolder{conn: svrConn}
+		holder = &connectionHolder{conn: svrConn, scId: scPool.scCount.Add(1)}
+		logger.Debugf("Created server connection #%d", holder.scId)
 	}
 
 	logger.Infof("Forward start: %s --(tunnel)-> dest", client.addr)
@@ -86,7 +85,7 @@ func (t *tunnelHandler) handlePacketConnection(packet []byte, client *udpClient,
 	}
 	logger.Infof("Forward end: %s --(tunnel)-> dest%s", client.addr, makeFlowTail(send, recv))
 
-	pool.Push(holder)
+	//scPool.Push(holder)
 }
 
 func (t *tunnelHandler) relayPacketConnection(packet []byte, client *udpClient, svrConn conn.StreamConn, logger *log.Entry) (send, recv int64, _ error) {
@@ -106,6 +105,7 @@ func (t *tunnelHandler) relayPacketConnection(packet []byte, client *udpClient, 
 		}
 		recv += int64(len(buf))
 		logger.Debugf("Received packet with size %d, forwarding", len(buf))
+		//logger.Debugf("%s", buf)
 
 		if err := client.Send(buf); err != nil {
 			return send, recv, fmt.Errorf("send packet to client failed: %v", err)
@@ -113,34 +113,40 @@ func (t *tunnelHandler) relayPacketConnection(packet []byte, client *udpClient, 
 	}
 }
 
+const serverConnectionTTL = 1 * time.Second
+
 type connectionHolder struct {
 	conn  conn.StreamConn
+	scId  uint64
 	timer *time.Timer
 	el    *list.Element
 }
 
-type connectionPool struct {
-	list  *list.List
-	mutex sync.Mutex
+type serverConnectionPool struct {
+	list    *list.List
+	mutex   sync.Mutex
+	logger  *log.Entry
+	scCount atomic.Uint64
 }
 
-func (p *connectionPool) Push(h *connectionHolder) {
+func (p *serverConnectionPool) Push(holder *connectionHolder) {
 	p.Lock()
 	defer p.Unlock()
 
-	h.timer = time.AfterFunc(5*time.Millisecond, func() {
+	holder.timer = time.AfterFunc(serverConnectionTTL, func() {
 		p.Lock()
 		defer p.Unlock()
-		if h.el != nil {
-			p.list.Remove(h.el)
-			_ = h.conn.Close()
-			h.el = nil
+		if holder.el != nil {
+			p.list.Remove(holder.el)
+			_ = holder.conn.Close()
+			p.logger.Debugf("Closed server connection #%d", holder.scId)
+			holder.el = nil
 		}
 	})
-	h.el = p.list.PushBack(h)
+	holder.el = p.list.PushBack(holder)
 }
 
-func (p *connectionPool) Pop() (*connectionHolder, bool) {
+func (p *serverConnectionPool) Pop() (*connectionHolder, bool) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -155,10 +161,10 @@ func (p *connectionPool) Pop() (*connectionHolder, bool) {
 	return holder, true
 }
 
-func (p *connectionPool) Lock() {
+func (p *serverConnectionPool) Lock() {
 	p.mutex.Lock()
 }
 
-func (p *connectionPool) Unlock() {
+func (p *serverConnectionPool) Unlock() {
 	p.mutex.Unlock()
 }

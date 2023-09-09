@@ -95,7 +95,7 @@ func newTunnelHandler(conf *config.Config, tun config.Tunnel, cipher sscore.Ciph
 		cipher: cipher,
 		stopCh: make(chan int, 1),
 		tunnel: tun,
-		logger: log.WithField("tid", tun.Id),
+		logger: log.WithField("tunnel", tun.Id),
 
 		serverAddr: conf.Server,
 		corking:    conf.Cork,

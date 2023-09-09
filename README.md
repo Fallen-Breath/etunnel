@@ -83,7 +83,7 @@ tunnels:
   dns:
     protocol: udp
     target: 1.1.1.1:53
-    meta:
+    params:
       ttl: 5s
 ```
 
@@ -122,7 +122,7 @@ $ ./etunnel tool -h
 
 Image available at [DockerHub](https://hub.docker.com/r/fallenbreath/etunnel)
 
-`docker run fallenbreath/etunnel xxx` works just like `./etunnel xxx`
+`docker run fallenbreath/etunnel:master xxx` works just like `./etunnel xxx`
 
 ## Security
 

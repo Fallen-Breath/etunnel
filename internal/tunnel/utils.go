@@ -80,12 +80,12 @@ type byteReaderFromReader struct {
 	r io.Reader
 }
 
-func (br *byteReaderFromReader) ReadByte() (byte, error) {
+func newByteReader(r io.Reader) io.ByteReader {
+	return &byteReaderFromReader{r: r}
+}
+
+func (br byteReaderFromReader) ReadByte() (byte, error) {
 	var buf [1]byte
 	_, err := br.r.Read(buf[:])
 	return buf[0], err
-}
-
-func newByteReader(r io.Reader) io.ByteReader {
-	return &byteReaderFromReader{r: r}
 }

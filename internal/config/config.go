@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-type TunnelMeta struct {
+type TunnelParams struct {
 	// for udp / unixgram
 	KeepAlive  bool          `yaml:"keep_alive"`
 	TimeToLive time.Duration `yaml:"ttl"`
 }
 
 type Tunnel struct {
-	Id       string     `yaml:"-"`
-	Protocol string     `yaml:"protocol"`
-	Listen   string     `yaml:"listen,omitempty"`
-	Target   string     `yaml:"target,omitempty"`
-	Meta     TunnelMeta `yaml:"meta"`
+	Id       string       `yaml:"-"`
+	Protocol string       `yaml:"protocol"`
+	Listen   string       `yaml:"listen,omitempty"`
+	Target   string       `yaml:"target,omitempty"`
+	Params   TunnelParams `yaml:"params"`
 }
 
 type Config struct {

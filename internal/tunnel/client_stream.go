@@ -6,6 +6,7 @@ import (
 	"github.com/Fallen-Breath/etunnel/internal/proto/header"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"sync/atomic"
 )
 
 // reference: github.com/shadowsocks/go-shadowsocks2/tcp.go tcpLocal
@@ -22,7 +23,7 @@ func (t *tunnelHandler) runStreamTunnel() {
 		_ = listener.Close()
 	}()
 
-	cid := 0
+	var cid atomic.Uint64
 	for {
 		cliConn, err := listener.Accept()
 		if err != nil {
@@ -31,10 +32,7 @@ func (t *tunnelHandler) runStreamTunnel() {
 		}
 
 		t.logger.Debugf("Accepted connection from %s", cliConn.RemoteAddr())
-
-		cid_ := cid
-		cid++
-		go t.handleStreamConnection(cliConn.(conn.StreamConn), t.logger.WithField("cid", cid_))
+		go t.handleStreamConnection(cliConn.(conn.StreamConn), t.logger.WithField("cid", cid.Add(1)))
 	}
 }
 

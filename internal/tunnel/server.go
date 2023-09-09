@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,7 +44,7 @@ func (t *Server) start() {
 		once.Do(func() { _ = listener.Close() })
 	}()
 
-	cid := 0
+	var cid atomic.Uint64
 	for {
 		cliConn, err := listener.Accept()
 		if t.stopped.Load() {
@@ -56,9 +57,7 @@ func (t *Server) start() {
 		}
 
 		log.Debugf("Accepted connection from %s", cliConn.RemoteAddr())
-		cid_ := cid
-		cid++
-		go t.handleConnection(cliConn.(conn.StreamConn), log.WithField("cid", cid_))
+		go t.handleConnection(cliConn.(conn.StreamConn), log.WithField("cid", cid.Add(1)))
 	}
 }
 
@@ -100,7 +99,7 @@ func (t *Server) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 		sendResponse(header.CodeBadKind)
 		return
 	}
-	logger = logger.WithField("tid", tun.Id)
+	logger = logger.WithField("tunnel", tun.Id)
 
 	targetConn, err := net.Dial(tun.Protocol, tun.Target)
 	if err != nil {
@@ -112,7 +111,7 @@ func (t *Server) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 	sendResponse(header.CodeOk)
 	_ = originConn.SetDeadline(time.Time{})
 
-	logger.Infof("Relay start %s <-> %s", cliConn.RemoteAddr(), tun.Target)
+	logger.Infof("Relay start %s <-> %s, kind %s", cliConn.RemoteAddr(), tun.Target, protoMeta.Kind)
 	var send, recv int64
 	switch protoMeta.Kind {
 	case proto.KindStream:
@@ -128,7 +127,7 @@ func (t *Server) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 		logger.Errorf("Unsupported protocol to relay: %s", tun.Protocol)
 		return
 	}
-	logger.Infof("Relay end %s -> %s%s", cliConn.RemoteAddr(), tun.Target, makeFlowTail(send, recv))
+	logger.Infof("Relay end %s -> %s%s, kind %s", cliConn.RemoteAddr(), tun.Target, makeFlowTail(send, recv), protoMeta.Kind)
 }
 
 func (t *Server) relayPacketConnection(cliConn conn.StreamConn, targetConn net.Conn, tun *config.Tunnel, logger *log.Entry) (send, recv int64, _ error) {
@@ -145,7 +144,7 @@ func (t *Server) relayPacketConnection(cliConn conn.StreamConn, targetConn net.C
 	buf = make([]byte, proto.MaxUdpPacketSize)
 
 	for {
-		if err := targetConn.SetReadDeadline(time.Now().Add(tun.Meta.TimeToLive)); err != nil {
+		if err := targetConn.SetReadDeadline(time.Now().Add(tun.Params.TimeToLive)); err != nil {
 			return send, recv, fmt.Errorf("SetReadDeadline failed: %v", err)
 		}
 
@@ -166,7 +165,7 @@ func (t *Server) relayPacketConnection(cliConn conn.StreamConn, targetConn net.C
 			return send, recv, fmt.Errorf("send packet to client failed: %v", err)
 		}
 
-		if !tun.Meta.KeepAlive {
+		if !tun.Params.KeepAlive {
 			logger.Debugf("no keep alive, closing connection")
 			return send, recv, nil
 		}

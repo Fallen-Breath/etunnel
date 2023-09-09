@@ -34,3 +34,14 @@ func (p payloadKind) Flag() uint8 {
 func (p payloadKind) valid() bool {
 	return kindMin <= p && p <= kindMax
 }
+
+func (p payloadKind) String() string {
+	switch p {
+	case KindStream:
+		return "stream"
+	case KindPacket:
+		return "packet"
+	default:
+		return fmt.Sprintf("kind_%d", p)
+	}
+}
