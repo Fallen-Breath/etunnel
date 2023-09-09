@@ -46,7 +46,7 @@ func (t *Client) reloadClient() {
 
 		handler, err := newTunnelHandler(t.conf, *tun, t.cipher)
 		if err != nil {
-			log.Errorf("invalid tunnel %s", tun)
+			log.Errorf("invalid tunnel %+v", tun)
 			continue
 		}
 

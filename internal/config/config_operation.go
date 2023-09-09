@@ -98,7 +98,7 @@ func ValidateConfig(conf *Config) error {
 		}
 		for _, tun := range conf.Tunnels {
 			if err := tun.Validate(conf.Mode); err != nil {
-				return fmt.Errorf("invalid tunnel definition %s: %+v", tun, err)
+				return fmt.Errorf("invalid tunnel definition %+v: %v", tun, err)
 			}
 		}
 		return nil

@@ -80,6 +80,11 @@ tunnels:
   ssh:
     protocol: tcp
     target: 192.168.1.1:22
+  dns:
+    protocol: udp
+    target: 1.1.1.1:53
+    meta:
+      ttl: 5s
 ```
 
 ```yaml
@@ -95,6 +100,9 @@ tunnels:
   ssh:
     protocol: tcp
     listen: 0.0.0.0:2222
+  dns:
+    protocol: udp
+    listen: :55353
 ```
 
 You can append a `--export config.yml` to CLI mode commands to export the arguments into a config file
