@@ -47,17 +47,21 @@ func (t *Tunnel) GetDefinition() string {
 }
 
 func (t *Tunnel) Validate(mode string) error {
-	if _, ok := proto.GetProtocolMeta(t.Protocol); !ok {
+	protoMeta, ok := proto.GetProtocolMeta(t.Protocol)
+	if !ok {
 		return fmt.Errorf("unknown protocol %s", t.Protocol)
 	}
-	switch mode {
-	case ModeServer:
-		if err := ValidateAddress(t.Target); err != nil {
-			return fmt.Errorf("invalid target address %s: %v", t.Target, err)
-		}
-	case ModeClient:
-		if err := ValidateAddress(t.Listen); err != nil {
-			return fmt.Errorf("invalid listen address %s: %v", t.Listen, err)
+
+	if protoMeta.Addr == proto.AddrRegular {
+		switch mode {
+		case ModeServer:
+			if err := ValidateAddress(t.Target); err != nil {
+				return fmt.Errorf("invalid target address %s: %v", t.Target, err)
+			}
+		case ModeClient:
+			if err := ValidateAddress(t.Listen); err != nil {
+				return fmt.Errorf("invalid listen address %s: %v", t.Listen, err)
+			}
 		}
 	}
 	return nil

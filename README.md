@@ -46,6 +46,20 @@ More detailed run
     -t ssh:tcp://:2222
 ```
 
+Using unix socket
+
+```bash
+./etunnel server -l 127.0.0.1:12000 -t unix:///var/run/docker.sock
+
+# 127.0.0.1:2375 -> /var/run/docker.sock
+./etunnel client -s 127.0.0.1:12000 -t tcp://127.0.0.1:2375
+docker -H tcp://127.0.0.1:2375 image ls
+
+# ./etunnel.sock -> /var/run/docker.sock
+./etunnel client -s 127.0.0.1:12000 -t unix://etunnel.sock
+docker -H unix://etunnel.sock image ls
+```
+
 Tunnel definition format: `[id:]protocol://address`, where:
 
 - `id`: the identifier of the tunnel. 
@@ -137,6 +151,7 @@ Supported encryption methods:
 ## TODO
 
 - [ ] hot-reload client / server
+- [x] `unix` support for tunnel
 - [ ] `udp` / `unixgram` support for tunnel
 - [ ] `kcp` / `quic` support for client - server communication
 - [ ] tcp proxy protocol support

@@ -103,13 +103,14 @@ func newTunnelHandler(conf *config.Config, tun config.Tunnel, cipher sscore.Ciph
 }
 
 func (t *tunnelHandler) Start() {
-	switch t.tunnel.Protocol {
-	case proto.Tcp:
+	protoMeta, _ := proto.GetProtocolMeta(t.tunnel.Protocol)
+	switch protoMeta.Kind {
+	case proto.KindStream:
 		t.runStreamTunnel()
-	case proto.Udp:
+	case proto.KindPacket:
 		t.runPacketTunnel()
 	default:
-		t.logger.Errorf("Unsupported protocol %s", t.tunnel.Protocol)
+		t.logger.Errorf("Unsupported protocol %s %d", t.tunnel.Protocol, protoMeta.Kind)
 	}
 }
 
