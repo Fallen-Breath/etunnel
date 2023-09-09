@@ -13,28 +13,52 @@ Notes that this tool only provides the tunneling functionality, it cannot be use
 
 ### CLI Mode
 
+Helps
+
 ```bash
-# helps
 ./etunnel --help
-./etunnel server -h
-# server
-./etunnel server -c AES-128-GCM -k my_secret_key -l :12000 \
-    -t website:tcp://127.0.0.1:22 \
-    -t ssh:tcp://127.0.0.1:22
-# client
-./etunnel client -c AES-128-GCM -k my_secret_key -s 192.168.1.1:12000 \
-    -t website:tcp://127.0.0.1:2222 \
-    -t ssh:tcp://:8000
-# tool
-./etunnel tool reload -p 5132
-./etunnel tool validate -c my_conf.yml
+./etunnel client -h
+./etunnel server --help
 ```
 
-Tunnel definition format: `protocol://listen/target`, where:
+Quick Run using default values
 
-- `protocol` can be `tcp` (TODO: or `udp`)
-- `listen` can be an address + port e.g. `127.0.0.1:2222`, or just the port e.g. `:2222` and the host will be `0.0.0.0`
-- `target` can be an address/hostname + port e.g. `127.0.0.1:22`, or just the port e.g. `:8000` and the host will be `127.0.0.1`
+```bash
+# -> (client) 0.0.0.0:8000 -> (server) 0.0.0.0:12000 -> (target) 127.0.0.1:8888 
+./etunnel server -l :12000 -t tcp://:8888
+./etunnel client -s :12000 -t tcp://:8000
+```
+
+More detailed run
+
+```bash
+# server
+./etunnel server \
+    -c AES-256-GCM -k my_secret_key  \
+    -l :12000 \
+    -t website:tcp://127.0.0.1:8000 \
+    -t ssh:tcp://192.168.1.1:22
+# client
+./etunnel client \
+    -c AES-256-GCM -k my_secret_key \
+    -s 192.168.1.1:12000 \
+    -t website:tcp://127.0.0.1:8888 \
+    -t ssh:tcp://:2222
+```
+
+Tunnel definition format: `[id:]protocol://address`, where:
+
+- `id`: the identifier of the tunnel. 
+  - Case-sensitive string, 1-255 characters long, composed of letters, numbers, hyphens, and underscores
+  - Should be consistent between client and server. 
+  - If not set, a default name based on the argument order will be used
+- `protocol`: the protocol of payload to be carried by the tunnel. Can be `tcp`, `udp`, `unix`, `unixgram`
+- `address`: a valid address depends on the mode and protocol
+  - For client, it's the address to listen on
+  - For server, it's the address to target on. It can be an address/hostname + port e.g. `127.0.0.1:22`, or just the port e.g. `:8000` and the host will be `127.0.0.1`
+  - Address format:
+    - `tcp`, `udp` tunnels: An address + port e.g. `127.0.0.1:2222`, or just the port e.g. `:2222`
+    - `unix`, `unixgram` tunnels: Path to the unix socket file
 
 ### Config Mode
 
@@ -47,23 +71,30 @@ Tunnel definition format: `protocol://listen/target`, where:
 # etunnel_server.yml
 mode: server
 listen: :12000
-crypt: AES-128-GCM
+crypt: AES-256-GCM
 key: my_secret_key
+tunnels:
+  website:
+    protocol: tcp
+    target: 127.0.0.1:8888
+  ssh:
+    protocol: tcp
+    target: 192.168.1.1:22
 ```
 
 ```yaml
 # etunnel_client.yml
 mode: client
 server: 192.168.1.1:12000
-crypt: AES-128-GCM
+crypt: AES-256-GCM
 key: my_secret_key
 tunnels:
-  - name: website
-    listen: tcp://:8080
-    target: tcp://10.10.10.1:8080
-  - name: ssh
-    listen: tcp://127.0.0.1:2222
-    target: tcp://127.0.0.1:22
+  website:
+    protocol: tcp
+    listen: 127.0.0.1:8000
+  ssh:
+    protocol: tcp
+    listen: 0.0.0.0:2222
 ```
 
 You can append a `--export config.yml` to CLI mode commands to export the arguments into a config file
@@ -97,7 +128,7 @@ Supported encryption methods:
 
 ## TODO
 
-- [ ] hot-reload client
+- [ ] hot-reload client / server
 - [ ] `udp` / `unixgram` support for tunnel
 - [ ] `kcp` / `quic` support for client - server communication
 - [ ] tcp proxy protocol support

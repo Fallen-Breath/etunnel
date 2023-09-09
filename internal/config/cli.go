@@ -65,6 +65,7 @@ func CliEntry() *Config {
 	rootCmd.AddCommand(serverCmd)
 	addTunnelFlags(serverCmd.Flags())
 	serverCmd.Flags().StringVarP(&flags.Listen, "listen", "l", "127.0.0.1:12000", "(server) The address to listen to")
+	serverCmd.Flags().StringSliceVarP(&flags.Tunnels, "tunnel", "t", nil, "List of the tunnels")
 
 	var clientCmd = &cobra.Command{
 		Use:   "client",
@@ -75,8 +76,8 @@ func CliEntry() *Config {
 	}
 	rootCmd.AddCommand(clientCmd)
 	addTunnelFlags(clientCmd.Flags())
-	clientCmd.Flags().StringVarP(&flags.Server, "server", "s", "127.0.0.1:12000", "(client) The address of the etunnel server")
-	clientCmd.Flags().StringSliceVarP(&flags.Tunnels, "tunnel", "t", nil, "(client) A list of encrypted tunnels")
+	clientCmd.Flags().StringVarP(&flags.Server, "server", "s", "127.0.0.1:12000", "The address of the etunnel server")
+	clientCmd.Flags().StringSliceVarP(&flags.Tunnels, "tunnel", "t", nil, "List of the tunnels")
 
 	var toolCmd = &cobra.Command{
 		Use:   "tool",

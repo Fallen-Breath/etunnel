@@ -7,14 +7,13 @@ import (
 	"github.com/Fallen-Breath/etunnel/internal/proto"
 	"gopkg.in/yaml.v3"
 	"os"
-	"regexp"
 	"strings"
 )
 
-var regexId = regexp.MustCompile("^[a-zA-Z0-9_-]{1,255}$")
-
 func LoadConfigFromFlags(flags *cliFlags) (*Config, error) {
-	conf := &Config{}
+	conf := &Config{
+		Tunnels: make(map[string]*Tunnel),
+	}
 	conf.Mode = flags.Mode
 	conf.Debug = flags.Debug
 
@@ -24,16 +23,9 @@ func LoadConfigFromFlags(flags *cliFlags) (*Config, error) {
 		conf.Cork = flags.Cork
 
 		for i, tunStr := range flags.Tunnels {
-			id, protocol, address, err := ParseTunnel(tunStr)
+			id, protocol, address, err := ParseTunnel(tunStr, fmt.Sprintf("tunnel-%d", i))
 			if err != nil {
 				return err
-			}
-
-			if len(id) == 0 {
-				id = fmt.Sprintf("tun%d", i)
-			}
-			if !regexId.MatchString(id) {
-				return fmt.Errorf("invalid tunnel id %s", id)
 			}
 
 			tun := Tunnel{
@@ -101,6 +93,14 @@ func ValidateConfig(conf *Config) error {
 		if len(conf.Key) == 0 {
 			return fmt.Errorf("empty key")
 		}
+		if len(conf.Tunnels) == 0 {
+			return errors.New("no tunnels are defined")
+		}
+		for _, tun := range conf.Tunnels {
+			if err := tun.Validate(conf.Mode); err != nil {
+				return fmt.Errorf("invalid tunnel definition %s: %+v", tun, err)
+			}
+		}
 		return nil
 	}
 
@@ -118,14 +118,6 @@ func ValidateConfig(conf *Config) error {
 		}
 		if err := ValidateAddress(conf.Server); err != nil {
 			return fmt.Errorf("invalid server adderss %s: %v", conf.Server, err)
-		}
-		if len(conf.Tunnels) == 0 {
-			return errors.New("no tunnels are defined")
-		}
-		for _, t := range conf.Tunnels {
-			if err := t.Validate(); err != nil {
-				return fmt.Errorf("invalid tunnel definition %s: %v", t, err)
-			}
 		}
 	case ModeTool:
 		if conf.ToolConf.Pid == 0 {

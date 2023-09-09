@@ -1,7 +1,9 @@
 package tunnel
 
 import (
+	"errors"
 	"fmt"
+	"github.com/Fallen-Breath/etunnel/internal/config"
 	"github.com/Fallen-Breath/etunnel/internal/conn"
 	"github.com/Fallen-Breath/etunnel/internal/proto"
 	"github.com/Fallen-Breath/etunnel/internal/proto/header"
@@ -54,8 +56,9 @@ func (t *Server) start() {
 		}
 
 		log.Debugf("Accepted connection from %s", cliConn.RemoteAddr())
-		go t.handleConnection(cliConn.(conn.StreamConn), log.WithField("cid", cid))
+		cid_ := cid
 		cid++
+		go t.handleConnection(cliConn.(conn.StreamConn), log.WithField("cid", cid_))
 	}
 }
 
@@ -92,10 +95,12 @@ func (t *Server) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 		sendResponse(header.CodeBadId)
 		return
 	}
-	if protoMeta, _ := proto.GetProtocolMeta(tun.Protocol); protoMeta.Kind != reqHead.Kind {
+	protoMeta, _ := proto.GetProtocolMeta(tun.Protocol)
+	if protoMeta.Kind != reqHead.Kind {
 		sendResponse(header.CodeBadKind)
 		return
 	}
+	logger = logger.WithField("tid", tun.Id)
 
 	targetConn, err := net.Dial(tun.Protocol, tun.Target)
 	if err != nil {
@@ -108,23 +113,62 @@ func (t *Server) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 	_ = originConn.SetDeadline(time.Time{})
 
 	logger.Infof("Relay start %s <-> %s", cliConn.RemoteAddr(), tun.Target)
-	flow := ""
-	switch tun.Protocol {
-	case proto.Tcp:
-		send, recv := relayConnection(cliConn, targetConn, logger)
-		if log.GetLevel() >= log.DebugLevel {
-			flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
-		}
+	var send, recv int64
+	switch protoMeta.Kind {
+	case proto.KindStream:
+		send, recv, _ = relayStreamConnection(cliConn, targetConn, logger)
 
-	case proto.Udp:
-		size := relayUdpConnection(cliConn, targetConn, logger)
-		if log.GetLevel() >= log.DebugLevel {
-			flow = fmt.Sprintf(" (packet size %d)", size)
+	case proto.KindPacket:
+		send, recv, err = t.relayPacketConnection(cliConn, targetConn, tun, logger)
+		if err != nil {
+			logger.Errorf("Relay packet connection error: %v", err)
 		}
 
 	default:
 		logger.Errorf("Unsupported protocol to relay: %s", tun.Protocol)
 		return
 	}
-	logger.Infof("Relay end %s -> %s%s", cliConn.RemoteAddr(), tun.Target, flow)
+	logger.Infof("Relay end %s -> %s%s", cliConn.RemoteAddr(), tun.Target, makeFlowTail(send, recv))
+}
+
+func (t *Server) relayPacketConnection(cliConn conn.StreamConn, targetConn net.Conn, tun *config.Tunnel, logger *log.Entry) (send, recv int64, _ error) {
+	buf, err := receivePacket(cliConn)
+	if err != nil {
+		return 0, 0, fmt.Errorf("receive packet from client failed: %v", err)
+	}
+
+	if _, err := targetConn.Write(buf); err != nil {
+		return 0, 0, fmt.Errorf("send packet to server failed: %v", err)
+	}
+
+	send, recv = int64(len(buf)), 0
+	buf = make([]byte, proto.MaxUdpPacketSize)
+
+	for {
+		if err := targetConn.SetReadDeadline(time.Now().Add(tun.Meta.TimeToLive)); err != nil {
+			return send, recv, fmt.Errorf("SetReadDeadline failed: %v", err)
+		}
+
+		n, err := targetConn.Read(buf)
+		if err != nil {
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				logger.Debugf("ttl timeout, closing connection")
+				return send, recv, nil
+			} else {
+				return send, recv, fmt.Errorf("receive packet from server failed: %v", err)
+			}
+		}
+		recv += int64(n)
+		logger.Debugf("Received packet with size %d, forwarding", n)
+
+		if err := sendPacket(cliConn, buf[:n]); err != nil {
+			return send, recv, fmt.Errorf("send packet to client failed: %v", err)
+		}
+
+		if !tun.Meta.KeepAlive {
+			logger.Debugf("no keep alive, closing connection")
+			return send, recv, nil
+		}
+	}
 }

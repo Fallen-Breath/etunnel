@@ -95,7 +95,7 @@ func newTunnelHandler(conf *config.Config, tun config.Tunnel, cipher sscore.Ciph
 		cipher: cipher,
 		stopCh: make(chan int, 1),
 		tunnel: tun,
-		logger: log.WithField("tunnel", tun.Id),
+		logger: log.WithField("tid", tun.Id),
 
 		serverAddr: conf.Server,
 		corking:    conf.Cork,
@@ -146,9 +146,9 @@ func (t *tunnelHandler) connectToServer(head *header.ReqHead) (conn.StreamConn, 
 	case header.CodeOk:
 		// ok
 	case header.CodeBadId:
-		return nil, fmt.Errorf("server rejects the tunnel, reason: bad id %s", t.tunnel.Id)
+		return nil, fmt.Errorf("server rejects the tunnel, bad id %s", t.tunnel.Id)
 	case header.CodeBadKind:
-		return nil, fmt.Errorf("server rejects the tunnel, reason: bad protocol %s", t.tunnel.Protocol)
+		return nil, fmt.Errorf("server rejects the tunnel, bad protocol %s", t.tunnel.Protocol)
 	default:
 		return nil, fmt.Errorf("unknown response code %d", headRsp.Code)
 	}

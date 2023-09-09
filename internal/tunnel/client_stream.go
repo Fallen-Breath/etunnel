@@ -1,7 +1,6 @@
 package tunnel
 
 import (
-	"fmt"
 	"github.com/Fallen-Breath/etunnel/internal/conn"
 	"github.com/Fallen-Breath/etunnel/internal/proto"
 	"github.com/Fallen-Breath/etunnel/internal/proto/header"
@@ -17,7 +16,7 @@ func (t *tunnelHandler) runStreamTunnel() {
 		return
 	}
 	defer func() { _ = listener.Close() }()
-	t.logger.Infof("Stream tunnel (%s) start: -> [ %s -> %s ] ->", t.tunnel.Protocol, t.tunnel.Listen, t.serverAddr)
+	t.logger.Infof("Stream tunnel (%s) start: ->[ %s -> %s ]->", t.tunnel.Protocol, t.tunnel.Listen, t.serverAddr)
 	go func() {
 		<-t.stopCh
 		_ = listener.Close()
@@ -33,8 +32,9 @@ func (t *tunnelHandler) runStreamTunnel() {
 
 		t.logger.Debugf("Accepted connection from %s", cliConn.RemoteAddr())
 
-		go t.handleStreamConnection(cliConn.(conn.StreamConn), t.logger.WithField("cid", cid))
+		cid_ := cid
 		cid++
+		go t.handleStreamConnection(cliConn.(conn.StreamConn), t.logger.WithField("cid", cid_))
 	}
 }
 
@@ -47,13 +47,10 @@ func (t *tunnelHandler) handleStreamConnection(cliConn conn.StreamConn, logger *
 	})
 	if err != nil {
 		logger.Errorf("Failed to connect to the server: %v", err)
+		return
 	}
 
 	logger.Infof("Relay start: %s <-(tunnel)-> dest", cliConn.RemoteAddr())
-	send, recv := relayConnection(cliConn, svrConn, logger)
-	flow := ""
-	if log.GetLevel() >= log.DebugLevel {
-		flow = fmt.Sprintf(" (send %d, recv %d)", send, recv)
-	}
-	logger.Infof("Relay end: %s <-(tunnel)-> dest%s", cliConn.RemoteAddr(), flow)
+	send, recv, _ := relayStreamConnection(cliConn, svrConn, logger)
+	logger.Infof("Relay end: %s <-(tunnel)-> dest%s", cliConn.RemoteAddr(), makeFlowTail(send, recv))
 }

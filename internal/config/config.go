@@ -4,18 +4,21 @@ import (
 	"fmt"
 	"github.com/Fallen-Breath/etunnel/internal/proto"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
+type TunnelMeta struct {
+	// for udp / unixgram
+	KeepAlive  bool          `yaml:"keep_alive"`
+	TimeToLive time.Duration `yaml:"ttl"`
+}
+
 type Tunnel struct {
-	// common
-	Id       string `yaml:"-"`
-	Protocol string `yaml:"protocol"`
-
-	// client
-	Listen string `yaml:"listen,omitempty"`
-
-	// server
-	Target string `yaml:"target,omitempty"`
+	Id       string     `yaml:"-"`
+	Protocol string     `yaml:"protocol"`
+	Listen   string     `yaml:"listen,omitempty"`
+	Target   string     `yaml:"target,omitempty"`
+	Meta     TunnelMeta `yaml:"meta"`
 }
 
 type Config struct {
@@ -43,15 +46,19 @@ func (t *Tunnel) GetDefinition() string {
 	return fmt.Sprintf("%s://%s/%s", t.Protocol, t.Listen, t.Target)
 }
 
-func (t *Tunnel) Validate() error {
+func (t *Tunnel) Validate(mode string) error {
 	if _, ok := proto.GetProtocolMeta(t.Protocol); !ok {
 		return fmt.Errorf("unknown protocol %s", t.Protocol)
 	}
-	if err := ValidateAddress(t.Listen); err != nil {
-		return err
-	}
-	if err := ValidateAddress(t.Target); err != nil {
-		return err
+	switch mode {
+	case ModeServer:
+		if err := ValidateAddress(t.Target); err != nil {
+			return fmt.Errorf("invalid target address %s: %v", t.Target, err)
+		}
+	case ModeClient:
+		if err := ValidateAddress(t.Listen); err != nil {
+			return fmt.Errorf("invalid listen address %s: %v", t.Listen, err)
+		}
 	}
 	return nil
 }
