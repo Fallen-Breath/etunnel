@@ -9,8 +9,8 @@ import (
 
 type TunnelParams struct {
 	// for udp / unixgram
-	KeepAlive  bool          `yaml:"keep_alive"`
-	TimeToLive time.Duration `yaml:"ttl"`
+	KeepAlive  bool          `yaml:"keep_alive,omitempty"`
+	TimeToLive time.Duration `yaml:"ttl,omitempty"`
 }
 
 type Tunnel struct {
@@ -18,7 +18,7 @@ type Tunnel struct {
 	Protocol string       `yaml:"protocol"`
 	Listen   string       `yaml:"listen,omitempty"`
 	Target   string       `yaml:"target,omitempty"`
-	Params   TunnelParams `yaml:"params"`
+	Params   TunnelParams `yaml:"params,omitempty"`
 }
 
 type Config struct {

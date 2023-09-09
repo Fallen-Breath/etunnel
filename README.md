@@ -94,11 +94,9 @@ tunnels:
   ssh:
     protocol: tcp
     target: 192.168.1.1:22
-  dns:
-    protocol: udp
-    target: 1.1.1.1:53
-    params:
-      ttl: 5s
+  docker:
+    protocol: unix
+    target: /var/run/docker.sock
 ```
 
 ```yaml
@@ -114,9 +112,9 @@ tunnels:
   ssh:
     protocol: tcp
     listen: 0.0.0.0:2222
-  dns:
-    protocol: udp
-    listen: :55353
+  docker:
+    protocol: tcp
+    listen: 127.0.0.1:2375
 ```
 
 You can append a `--export config.yml` to CLI mode commands to export the arguments into a config file
