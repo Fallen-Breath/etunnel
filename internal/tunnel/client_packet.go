@@ -3,7 +3,9 @@ package tunnel
 import (
 	"container/list"
 	"encoding/binary"
+	"fmt"
 	"github.com/Fallen-Breath/etunnel/internal/conn"
+	"github.com/Fallen-Breath/etunnel/internal/proto"
 	"github.com/Fallen-Breath/etunnel/internal/proto/header"
 	log "github.com/sirupsen/logrus"
 	"math"
@@ -12,7 +14,7 @@ import (
 	"time"
 )
 
-func (t *tunnelHandlerImpl) runPacketTunnel() {
+func (t *tunnelHandler) runPacketTunnel() {
 	if true {
 		t.logger.Errorf("Packet tunnel has not implemented yet")
 		return
@@ -24,7 +26,7 @@ func (t *tunnelHandlerImpl) runPacketTunnel() {
 		return
 	}
 	defer func() { _ = listener.Close() }()
-	t.logger.Infof("Packet tunnel (%s) start: -> %s -> %s -> %s", t.tunnel.Protocol, t.tunnel.Listen, t.serverAddr, t.tunnel.Target)
+	t.logger.Infof("Packet tunnel (%s) start: -> [ %s -> %s ] ->", t.tunnel.Protocol, t.tunnel.Listen, t.serverAddr)
 	go func() {
 		<-t.stopCh
 		_ = listener.Close()
@@ -47,7 +49,7 @@ func (t *tunnelHandlerImpl) runPacketTunnel() {
 	}
 }
 
-func (t *tunnelHandlerImpl) handlePacketConnection(packet []byte, addr net.Addr, pool *connectionPool, logger *log.Entry) {
+func (t *tunnelHandler) handlePacketConnection(packet []byte, addr net.Addr, pool *connectionPool, logger *log.Entry) {
 	length := len(packet)
 	if len(packet) > math.MaxUint16 {
 		logger.Errorf("UDP packet too large, %d > %d", length, math.MaxUint16)
@@ -55,9 +57,9 @@ func (t *tunnelHandlerImpl) handlePacketConnection(packet []byte, addr net.Addr,
 
 	holder, ok := pool.Pop()
 	if !ok {
-		svrConn, err := t.connectToServer(&header.Header{
-			Protocol: t.tunnel.Protocol,
-			Target:   t.tunnel.Target,
+		svrConn, err := t.connectToServer(&header.ReqHead{
+			Kind: proto.KindPacket,
+			Id:   t.tunnel.Id,
 		})
 		if err != nil {
 			logger.Errorf("Failed to connect to the server: %v", err)
@@ -66,6 +68,8 @@ func (t *tunnelHandlerImpl) handlePacketConnection(packet []byte, addr net.Addr,
 
 		holder = &connectionHolder{conn: svrConn}
 	}
+
+	logger.Infof("Forward start: %s --(tunnel)-> dest", addr)
 
 	buf := binary.BigEndian.AppendUint16(nil, uint16(length))
 	if _, err := holder.conn.Write(buf); err != nil {
@@ -78,6 +82,12 @@ func (t *tunnelHandlerImpl) handlePacketConnection(packet []byte, addr net.Addr,
 		logger.Errorf("Failed to write packet to the server: %v", err)
 		return
 	}
+
+	flow := ""
+	if log.GetLevel() >= log.DebugLevel {
+		flow = fmt.Sprintf(" (send %d)", length)
+	}
+	logger.Infof("Forward end: %s --(tunnel)-> dest%s", addr, flow)
 
 	pool.Push(holder)
 }

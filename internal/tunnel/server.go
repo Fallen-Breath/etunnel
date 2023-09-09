@@ -1,7 +1,6 @@
 package tunnel
 
 import (
-	"encoding/binary"
 	"fmt"
 	"github.com/Fallen-Breath/etunnel/internal/conn"
 	"github.com/Fallen-Breath/etunnel/internal/proto"
@@ -13,8 +12,18 @@ import (
 	"time"
 )
 
-// reference: github.com/shadowsocks/go-shadowsocks2/tcp.go tcpRemote
-func (t *Tunnel) runServer() {
+type Server struct {
+	*base
+}
+
+func newServer(base *base) (ITunnel, error) {
+	return &Server{
+		base: base,
+	}, nil
+}
+
+// Start reference: github.com/shadowsocks/go-shadowsocks2/tcp.go tcpRemote
+func (t *Server) start() {
 	listener, err := net.Listen("tcp", t.conf.Listen)
 	if err != nil {
 		// server fails hard
@@ -50,7 +59,7 @@ func (t *Tunnel) runServer() {
 	}
 }
 
-func (t *Tunnel) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
+func (t *Server) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 	defer func() { _ = cliConn.Close() }()
 	originConn := cliConn
 	_ = originConn.SetDeadline(time.Now().Add(30 * time.Second))
@@ -60,8 +69,8 @@ func (t *Tunnel) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 	}
 	cliConn = conn.NewEncryptedStreamConn(originConn, t.cipher)
 
-	var head header.Header
-	if err := head.UnmarshalFrom(cliConn); err != nil {
+	var reqHead header.ReqHead
+	if err := reqHead.UnmarshalFrom(cliConn); err != nil {
 		logger.Errorf("Failed to read header: %v", err)
 		// drain originConn to avoid leaking server behavioral features
 		// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
@@ -70,19 +79,37 @@ func (t *Tunnel) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 		}
 		return
 	}
-	_ = originConn.SetDeadline(time.Time{})
 
-	target := head.Target
-	targetConn, err := net.Dial(head.Protocol, target)
+	sendResponse := func(code uint8) {
+		rspHead := header.RspHead{Code: code}
+		if err := rspHead.MarshalTo(cliConn); err != nil {
+			logger.Errorf("Send response header error: %v", err)
+		}
+	}
+
+	tun, ok := t.conf.Tunnels[reqHead.Id]
+	if !ok {
+		sendResponse(header.CodeBadId)
+		return
+	}
+	if protoMeta, _ := proto.GetProtocolMeta(tun.Protocol); protoMeta.Kind != reqHead.Kind {
+		sendResponse(header.CodeBadKind)
+		return
+	}
+
+	targetConn, err := net.Dial(tun.Protocol, tun.Target)
 	if err != nil {
-		logger.Errorf("Failed to connect to target %s://%s: %v", head.Protocol, head.Target, err)
+		logger.Errorf("Failed to connect to target %s://%s: %v", tun.Protocol, tun.Target, err)
 		return
 	}
 	defer func() { _ = targetConn.Close() }()
 
-	logger.Infof("Relay start %s <-> %s", cliConn.RemoteAddr(), target)
+	sendResponse(header.CodeOk)
+	_ = originConn.SetDeadline(time.Time{})
+
+	logger.Infof("Relay start %s <-> %s", cliConn.RemoteAddr(), tun.Target)
 	flow := ""
-	switch head.Protocol {
+	switch tun.Protocol {
 	case proto.Tcp:
 		send, recv := relayConnection(cliConn, targetConn, logger)
 		if log.GetLevel() >= log.DebugLevel {
@@ -96,30 +123,8 @@ func (t *Tunnel) handleConnection(cliConn conn.StreamConn, logger *log.Entry) {
 		}
 
 	default:
-		logger.Errorf("Unsupported protocol to relay: %s", head.Protocol)
+		logger.Errorf("Unsupported protocol to relay: %s", tun.Protocol)
 		return
 	}
-	logger.Infof("Relay end %s -> %s%s", cliConn.RemoteAddr(), target, flow)
-}
-
-func relayUdpConnection(cliConn conn.StreamConn, targetConn net.Conn, logger *log.Entry) int64 {
-	buf := make([]byte, 2)
-	if _, err := io.ReadFull(cliConn, buf); err != nil {
-		logger.Errorf("Failed to receive udp packet length")
-		return 0
-	}
-
-	length := binary.BigEndian.Uint16(buf)
-	buf = make([]byte, length)
-	if _, err := io.ReadFull(cliConn, buf); err != nil {
-		logger.Errorf("Failed to receive udp packet body")
-		return 0
-	}
-
-	if _, err := targetConn.Write(buf); err != nil {
-		logger.Errorf("Failed to send udp packet")
-		return 0
-	}
-
-	return int64(length)
+	logger.Infof("Relay end %s -> %s%s", cliConn.RemoteAddr(), tun.Target, flow)
 }

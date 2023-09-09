@@ -17,14 +17,14 @@ func main() {
 	switch conf.Mode {
 	case config.ModeServer, config.ModeClient:
 		log.Infof("%s v%s starting, mode %s, pid %d", constants.Name, constants.Version, conf.Mode, os.Getpid())
-		tun, err := tunnel.NewTunnel(conf)
+		mgr, err := tunnel.NewManager(conf)
 		if err != nil {
 			log.Fatalf("Failed to initialize %s: %v", constants.Name, err)
 		}
-		tun.Run()
+		mgr.Run()
 
 	case config.ModeTool:
-		tool.RunTools(conf.ToolConf)
+		tool.RunTools(&conf.ToolConf)
 	}
 }
 

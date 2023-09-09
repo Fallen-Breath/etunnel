@@ -18,13 +18,16 @@ Notes that this tool only provides the tunneling functionality, it cannot be use
 ./etunnel --help
 ./etunnel server -h
 # server
-./etunnel server -c AES-128-GCM -k my_secret_key -l :12000
+./etunnel server -c AES-128-GCM -k my_secret_key -l :12000 \
+    -t website:tcp://127.0.0.1:22 \
+    -t ssh:tcp://127.0.0.1:22
 # client
 ./etunnel client -c AES-128-GCM -k my_secret_key -s 192.168.1.1:12000 \
-    -t tcp://127.0.0.1:2222/127.0.0.1:22 \
-    -t tcp://:8000/10.10.10.1:8080
+    -t website:tcp://127.0.0.1:2222 \
+    -t ssh:tcp://:8000
 # tool
-./etunnel tool -p 5132 --reload
+./etunnel tool reload -p 5132
+./etunnel tool validate -c my_conf.yml
 ```
 
 Tunnel definition format: `protocol://listen/target`, where:

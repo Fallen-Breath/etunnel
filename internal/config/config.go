@@ -7,10 +7,15 @@ import (
 )
 
 type Tunnel struct {
-	Name     string `yaml:"name"`
+	// common
+	Id       string `yaml:"-"`
 	Protocol string `yaml:"protocol"`
-	Listen   string `yaml:"listen"`
-	Target   string `yaml:"target"`
+
+	// client
+	Listen string `yaml:"listen,omitempty"`
+
+	// server
+	Target string `yaml:"target,omitempty"`
 }
 
 type Config struct {
@@ -18,19 +23,15 @@ type Config struct {
 	Mode  string `yaml:"mode"`
 	Debug bool   `yaml:"debug"`
 
-	Crypt string `yaml:"crypt"`
-	Key   string `yaml:"key"`
-	Cork  bool   `yaml:"cork,omitempty"`
-
-	// server
-	Listen string `yaml:"listen,omitempty"`
-
-	// client
-	Server  string   `yaml:"server,omitempty"`
-	Tunnels []Tunnel `yaml:"tunnels,omitempty"`
+	Crypt   string             `yaml:"crypt"`
+	Key     string             `yaml:"key"`
+	Cork    bool               `yaml:"cork,omitempty"`
+	Listen  string             `yaml:"listen,omitempty"` // server only
+	Server  string             `yaml:"server,omitempty"` // client only
+	Tunnels map[string]*Tunnel `yaml:"tunnels"`
 
 	// tool
-	ToolConf *ToolConfig `yaml:"-"`
+	ToolConf ToolConfig `yaml:"-"`
 }
 
 type ToolConfig struct {

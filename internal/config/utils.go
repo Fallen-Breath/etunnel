@@ -4,40 +4,67 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/Fallen-Breath/etunnel/internal/proto"
 	"gopkg.in/yaml.v3"
 	"os"
+	"regexp"
+	"strings"
 )
 
+var regexId = regexp.MustCompile("^[a-zA-Z0-9_-]{1,255}$")
+
 func LoadConfigFromFlags(flags *cliFlags) (*Config, error) {
-	conf := &Config{ToolConf: &ToolConfig{}}
+	conf := &Config{}
 	conf.Mode = flags.Mode
 	conf.Debug = flags.Debug
 
-	loadTunnelCommon := func() {
+	loadTunnelCommon := func() error {
 		conf.Crypt = flags.Crypt
 		conf.Key = flags.Key
 		conf.Cork = flags.Cork
+
+		for i, tunStr := range flags.Tunnels {
+			id, protocol, address, err := ParseTunnel(tunStr)
+			if err != nil {
+				return err
+			}
+
+			if len(id) == 0 {
+				id = fmt.Sprintf("tun%d", i)
+			}
+			if !regexId.MatchString(id) {
+				return fmt.Errorf("invalid tunnel id %s", id)
+			}
+
+			tun := Tunnel{
+				Id:       id,
+				Protocol: protocol.Name,
+			}
+			switch conf.Mode {
+			case ModeServer:
+				tun.Target = address
+			case ModeClient:
+				tun.Listen = address
+			}
+
+			conf.Tunnels[id] = &tun
+		}
+		return nil
 	}
 
 	switch conf.Mode {
 	case ModeServer:
-		loadTunnelCommon()
 		conf.Listen = flags.Listen
-	case ModeClient:
-		loadTunnelCommon()
-		for i, tunStr := range flags.Tunnels {
-			protocol, listen, target, err := ParseTunnel(tunStr)
-			if err != nil {
-				return nil, err
-			}
-			conf.Tunnels = append(conf.Tunnels, Tunnel{
-				Name:     fmt.Sprintf("Tunnel-%d", i),
-				Protocol: protocol.Name,
-				Listen:   listen,
-				Target:   target,
-			})
+		if err := loadTunnelCommon(); err != nil {
+			return nil, err
 		}
+
+	case ModeClient:
 		conf.Server = flags.Server
+		if err := loadTunnelCommon(); err != nil {
+			return nil, err
+		}
+
 	case ModeTool:
 		conf.ToolConf.Pid = flags.ToolPid
 		conf.ToolConf.Reload = flags.ToolReload
@@ -54,6 +81,11 @@ func LoadConfigFromFile(configPath string) (*Config, error) {
 	if err := yaml.Unmarshal(buf, conf); err != nil {
 		return nil, fmt.Errorf("failed to parse yaml from config file %s: %v", configPath, err)
 	}
+
+	for id, tun := range conf.Tunnels {
+		tun.Id = id
+	}
+
 	return conf, nil
 }
 
@@ -115,4 +147,24 @@ func WriteConfigToFile(conf *Config, configPath string) error {
 		return fmt.Errorf("failed to write config file %s: %v", configPath, err)
 	}
 	return nil
+}
+
+func ParseCommunicateAddress(pa string) (protocol, address string, err error) {
+	t := strings.Split(pa, "://")
+	if len(t) == 1 {
+		protocol = proto.Tcp // use tcp by default
+	} else if len(t) == 2 {
+		protocol = t[0]
+		if ok := proto.CheckProtocol(protocol); !ok {
+			return "", "", fmt.Errorf("invalid protocol %s", protocol)
+		}
+	} else {
+		return "", "", errors.New("invalid protocol separation, check your '://' divider")
+	}
+
+	address = t[len(t)-1]
+	if err := ValidateAddress(address); err != nil {
+		return "", "", err
+	}
+	return protocol, address, nil
 }

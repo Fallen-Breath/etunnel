@@ -2,26 +2,27 @@ package proto
 
 type ProtocolMeta struct {
 	Name        string
-	Tunnel      bool // valid tunnel protocol?
-	Communicate bool // valid communicate protocol?
+	Communicate bool        // valid communicate protocol?
+	Tunnel      bool        // valid tunnel protocol?
+	Kind        PayloadKind // payload kind it provides if it can be used in tunnel
 }
 
 const (
-	Tcp  = "tcp"
-	Udp  = "udp"
-	Kcp  = "kcp"
-	Quic = "quic"
-	//Unix     = "unix"
-	//UnixGram = "unixgram"
+	Tcp      = "tcp"
+	Udp      = "udp"
+	Kcp      = "kcp"
+	Quic     = "quic"
+	Unix     = "unix"
+	UnixGram = "unixgram"
 )
 
 var (
-	TcpMeta  = ProtocolMeta{Tcp, true, true}
-	UdpMeta  = ProtocolMeta{Udp, true, false}
-	KcpMeta  = ProtocolMeta{Kcp, false, true}
-	QuicMeta = ProtocolMeta{Quic, false, true}
-	//UnixMeta     = ProtocolMeta{"unix", true, false}
-	//UnixGramMeta = ProtocolMeta{"unixgram", true, false}
+	TcpMeta      = ProtocolMeta{Tcp, true, true, KindStream}
+	UdpMeta      = ProtocolMeta{Udp, false, true, KindPacket}
+	KcpMeta      = ProtocolMeta{Kcp, true, false, nil}
+	QuicMeta     = ProtocolMeta{Quic, true, false, nil}
+	UnixMeta     = ProtocolMeta{Unix, false, true, KindStream}
+	UnixGramMeta = ProtocolMeta{UnixGram, false, true, KindPacket}
 )
 
 var protocolMap = map[string]ProtocolMeta{}
