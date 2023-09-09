@@ -1,5 +1,7 @@
 # etunnel
 
+**Still in early development, expect breaking changes**
+
 [![Docker](https://img.shields.io/docker/v/fallenbreath/etunnel/latest)](https://hub.docker.com/r/fallenbreath/etunnel)
 
 A secure encrypted tunnel. Encrypt and transfer your secret data on public network safely
