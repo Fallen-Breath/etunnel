@@ -7,7 +7,7 @@
 A secure encrypted tunnel. Encrypt and transfer your secret data on public network safely
 
 Thanks [go-shadowsocks2](https://github.com/shadowsocks/go-shadowsocks2) for providing the tunnel encryption logic.
-Notes that this tool only provides the tunneling functionality, it cannot be used as a proxy
+Notes that this tool only provides the tunneling functionality, it can never be used as a proxy
 
 ## Usages
 
