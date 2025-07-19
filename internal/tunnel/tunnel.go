@@ -13,7 +13,7 @@ type ITunnel interface {
 	stop()
 }
 
-type base struct {
+type tunnelBase struct {
 	conf    *config.Config
 	mutex   sync.RWMutex // TODO: make conf access concurrency safe
 	cipher  sscore.Cipher
@@ -21,16 +21,16 @@ type base struct {
 	stopped atomic.Bool
 }
 
-var _ ITunnel = &base{}
+var _ ITunnel = &tunnelBase{}
 
-func (t *base) start() {
+func (t *tunnelBase) start() {
 	panic("unimplement")
 }
 
-func (t *base) reload() {
+func (t *tunnelBase) reload() {
 }
 
-func (t *base) stop() {
+func (t *tunnelBase) stop() {
 	t.stopped.Store(true)
 	t.stopCh <- 0
 }

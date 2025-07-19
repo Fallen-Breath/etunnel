@@ -16,12 +16,12 @@ import (
 )
 
 type Server struct {
-	*base
+	*tunnelBase
 }
 
-func newServer(base *base) (ITunnel, error) {
+func newServer(base *tunnelBase) (ITunnel, error) {
 	return &Server{
-		base: base,
+		tunnelBase: base,
 	}, nil
 }
 

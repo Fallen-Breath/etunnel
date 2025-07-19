@@ -28,7 +28,7 @@ func NewManager(conf *config.Config) (Manager, error) {
 		return nil, err
 	}
 
-	base := &base{
+	base := &tunnelBase{
 		conf:   conf,
 		cipher: cipher,
 		stopCh: make(chan int, 1),

@@ -24,12 +24,12 @@ Helps
 Quick Run using default values
 
 ```bash
-# -> (client) 0.0.0.0:8000 -> (server) 0.0.0.0:12000 -> (target) 127.0.0.1:8888 
-./etunnel server -l :12000 -t tcp://:8888
-./etunnel client -s :12000 -t tcp://:8000
+# inbound -> (etunnel client) 0.0.0.0:8000 --[etunnel]-> (etunnel server) 1.2.3.4:12000 -> (target) 127.0.0.1:8888 
+./etunnel server -l :12000 -t tcp://127.0.0.1:8888  # listen on :12000, tunnel outbound to :8888
+./etunnel client -s 1.2.3.4:12000 -t tcp://:8000  # serve at 127.0.0.1:12000, tunnel inbound from :8000
 ```
 
-More detailed run
+More detailed run examples
 
 ```bash
 # server

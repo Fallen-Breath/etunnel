@@ -14,16 +14,16 @@ import (
 )
 
 type Client struct {
-	*base
+	*tunnelBase
 
 	wg       sync.WaitGroup
 	handlers map[string]*tunnelHandler // tunnel definition -> handler
 }
 
-func newClient(base *base) (ITunnel, error) {
+func newClient(base *tunnelBase) (ITunnel, error) {
 	return &Client{
-		base:     base,
-		handlers: make(map[string]*tunnelHandler),
+		tunnelBase: base,
+		handlers:   make(map[string]*tunnelHandler),
 	}, nil
 }
 
