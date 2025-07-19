@@ -19,12 +19,13 @@ const (
 	modeRoot = "root" // for root command
 )
 
-// Crypts values see github.com/shadowsocks/go-shadowsocks2/core/cipher.go PickCipher
+// Crypts values see https://github.com/shadowsocks/go-shadowsocks2/blob/master/core/cipher.go PickCipher
 var Crypts = []string{
 	"AES-128-GCM",
 	"AES-256-GCM",
 	"CHACHA20-IETF-POLY1305",
 }
+var DefaultCrypt = "AES-256-GCM"
 
 var regexId = regexp.MustCompile("^[a-zA-Z0-9_-]{1,255}$")
 

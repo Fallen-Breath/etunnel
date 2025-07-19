@@ -49,7 +49,7 @@ func CliEntry() *Config {
 
 	addTunnelFlags := func(fs *pflag.FlagSet) {
 		fs.StringVarP(&flags.Mode, "mode", "m", "", "The mode of etunnel. Options: client, server")
-		fs.StringVarP(&flags.Crypt, "crypt", "c", Crypts[0], "The encryption method to use. Options: "+strings.Join(Crypts, ", "))
+		fs.StringVarP(&flags.Crypt, "crypt", "c", DefaultCrypt, "The encryption method to use. Options: "+strings.Join(Crypts, ", "))
 		fs.StringVarP(&flags.Key, "key", "k", "hidden secret", "The secret password for encryption")
 		fs.BoolVar(&flags.Cork, "cork", false, "Enable tcp corking")
 		fs.StringVar(&flags.ExportConfig, "export", "", "Export CLI arguments to the given yaml config file")

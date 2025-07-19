@@ -142,8 +142,8 @@ etunnel uses Authenticated Encryption with Associated Data (AEAD) encryption met
 
 Supported encryption methods:
 
-- `AES-128-GCM` (default)
-- `AES-256-GCM`
+- `AES-128-GCM`
+- `AES-256-GCM` (default)
 - `CHACHA20-IETF-POLY1305`
 
 ## TODO
